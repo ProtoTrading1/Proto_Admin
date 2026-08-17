@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import { PROTO_URLS } from './_proto-urls.js';
 
 function escapeHtml(value) {
@@ -48,6 +49,42 @@ export function applyMergeTags(template, vars = {}) {
   });
 }
 
+function base64Url(value) {
+  return Buffer.from(String(value || ''), 'utf8').toString('base64url');
+}
+
+function getUnsubscribeSecret() {
+  return String(
+    process.env.MARKETING_UNSUBSCRIBE_SECRET
+    || process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.WEBHOOK_SECRET
+    || '',
+  ).trim();
+}
+
+export function buildUnsubscribeToken(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const secret = getUnsubscribeSecret();
+  if (!normalizedEmail || !secret) return '';
+  return createHmac('sha256', secret).update(normalizedEmail).digest('base64url');
+}
+
+export function verifyUnsubscribeToken(email, token) {
+  const expected = buildUnsubscribeToken(email);
+  const actual = String(token || '').trim();
+  if (!expected || !actual) return false;
+  const left = Buffer.from(expected);
+  const right = Buffer.from(actual);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+export function buildUnsubscribeUrl(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const token = buildUnsubscribeToken(normalizedEmail);
+  if (!normalizedEmail || !token) return '';
+  return `${PROTO_URLS.admin}/api/email-unsubscribe?e=${base64Url(normalizedEmail)}&t=${encodeURIComponent(token)}`;
+}
+
 export function buildRecipientVars(recipient = {}) {
   const business = recipient.business_name || recipient.name || '';
   const contact = recipient.contact_name || recipient.name || recipient.first_name || '';
@@ -61,6 +98,8 @@ export function buildRecipientVars(recipient = {}) {
     customer_code: code,
     account_code: recipient.account_code || recipient.customer_code || code,
     phone: recipient.phone || '',
+    unsubscribe: recipient.unsubscribe_url || buildUnsubscribeUrl(recipient.email),
+    unsubscribe_url: recipient.unsubscribe_url || buildUnsubscribeUrl(recipient.email),
   };
 }
 
@@ -73,6 +112,8 @@ export const TEST_MERGE_VARS = {
   customer_code: 'ABC123',
   account_code: 'ABC123',
   phone: '082 555 1234',
+  unsubscribe: `${PROTO_URLS.admin}/api/email-unsubscribe?preview=1`,
+  unsubscribe_url: `${PROTO_URLS.admin}/api/email-unsubscribe?preview=1`,
 };
 
 export function buildComposedEmail({ subject, introText = '', htmlBlock = '' }, vars = {}) {
@@ -180,6 +221,39 @@ async function fetchAllFromTable(sb, table, buildQuery) {
   return rows;
 }
 
+async function fetchOptedOutEmails(sb, emails = []) {
+  const wanted = [...new Set(
+    (emails || []).map((e) => String(e || '').trim().toLowerCase()).filter((e) => e.includes('@')),
+  )];
+  if (!wanted.length) return new Set();
+  const optedOut = new Set();
+  for (let i = 0; i < wanted.length; i += 500) {
+    const chunk = wanted.slice(i, i + 500);
+    const { data, error } = await sb
+      .from('marketing_email_opt_outs')
+      .select('email')
+      .in('email', chunk);
+    if (error) {
+      if (/marketing_email_opt_outs/i.test(error.message || '')) {
+        console.warn('marketing_email_opt_outs table is not available; broadcasts cannot filter opt-outs yet.');
+        return optedOut;
+      }
+      throw error;
+    }
+    (data || []).forEach((row) => {
+      const email = String(row.email || '').trim().toLowerCase();
+      if (email) optedOut.add(email);
+    });
+  }
+  return optedOut;
+}
+
+async function excludeOptedOutRecipients(sb, recipients) {
+  const optedOut = await fetchOptedOutEmails(sb, recipients.map((r) => r.email));
+  if (!optedOut.size) return recipients;
+  return recipients.filter((recipient) => !optedOut.has(String(recipient.email || '').trim().toLowerCase()));
+}
+
 function upsertRecipient(seen, row) {
   const email = String(row.email || '').trim().toLowerCase();
   if (!email || !email.includes('@')) return;
@@ -228,7 +302,7 @@ export async function fetchRecipientsByEmail(sb, emails = []) {
   for (const email of wanted) {
     if (!seen.has(email)) seen.set(email, { email });
   }
-  return [...seen.values()];
+  return excludeOptedOutRecipients(sb, [...seen.values()]);
 }
 
 export async function fetchCustomerAudience(sb, audience, { businessTypes = [], importBatch = '', groupId = '' } = {}) {
@@ -313,7 +387,7 @@ export async function fetchCustomerAudience(sb, audience, { businessTypes = [], 
     });
   }
 
-  return [...seen.values()];
+  return excludeOptedOutRecipients(sb, [...seen.values()]);
 }
 
 // Bounded concurrency keeps a 1000-recipient broadcast well inside the 300s

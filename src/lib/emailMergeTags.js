@@ -6,6 +6,8 @@ export const MERGE_TAGS = [
   { key: 'name', label: 'Name', sample: 'Jane Smith' },
   { key: 'business_name', label: 'Business name', sample: 'ABC Stationers' },
   { key: 'email', label: 'Email', sample: 'jane@abcstationers.co.za' },
+  { key: 'unsubscribe', label: 'Unsubscribe link', sample: 'https://admin.proto.co.za/api/email-unsubscribe?preview=1' },
+  { key: 'unsubscribe_url', label: 'Unsubscribe link', sample: 'https://admin.proto.co.za/api/email-unsubscribe?preview=1' },
 ];
 
 export const PREVIEW_MERGE_VARS = Object.fromEntries(
