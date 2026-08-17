@@ -76,4 +76,12 @@ describe('marketing unsubscribe flow', () => {
     expect(previewMergeTags).toContain("key: 'unsubscribe'");
     expect(previewMergeTags).toContain("key: 'unsubscribe_url'");
   });
+
+  it('gives test sends a real signed unsubscribe link instead of a dummy preview URL', () => {
+    const endpoint = fs.readFileSync(new URL('../api/customer-email-broadcast.js', import.meta.url), 'utf8');
+
+    expect(endpoint).toContain('buildRecipientVars');
+    expect(endpoint).toContain('...buildRecipientVars(to)');
+    expect(endpoint).not.toMatch(/buildComposedEmail\(\s*\{\s*subject: subj,\s*introText: intro,\s*htmlBlock: html\s*\},\s*TEST_MERGE_VARS,\s*\)/);
+  });
 });

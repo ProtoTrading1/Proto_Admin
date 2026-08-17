@@ -1,6 +1,7 @@
 import { requireAdminKey } from './_admin-auth.js';
 import {
   buildComposedEmail,
+  buildRecipientVars,
   TEST_MERGE_VARS,
   sendBrevoTransactional,
 } from './_brevo-email.js';
@@ -58,9 +59,17 @@ export default async function handler(req, res) {
   try {
     if (testEmail) {
       const to = { email: String(testEmail).trim().toLowerCase(), name: 'Test' };
+      const testVars = {
+        ...TEST_MERGE_VARS,
+        ...buildRecipientVars(to),
+        name: TEST_MERGE_VARS.name,
+        first_name: TEST_MERGE_VARS.first_name,
+        contact_name: TEST_MERGE_VARS.contact_name,
+        business_name: TEST_MERGE_VARS.business_name,
+      };
       const composed = buildComposedEmail(
         { subject: subj, introText: intro, htmlBlock: html },
-        TEST_MERGE_VARS,
+        testVars,
       );
       await sendBrevoTransactional({
         to,
