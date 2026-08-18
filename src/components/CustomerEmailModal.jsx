@@ -269,6 +269,28 @@ export default function CustomerEmailModal({
     if (aud === 'group') setBusinessTypes([]);
   };
 
+  // A native <select> whose `value` matches no <option> silently displays the
+  // FIRST option and fires no onChange. So the form could sit on
+  // audience='group' with an empty groupId while the control read "Approved
+  // trade customers" — invisible here, and rejected by the server only at Send
+  // time ("Choose a group to send to."). Reconcile state to something the
+  // control can actually show.
+  useEffect(() => {
+    if (!open || !audienceOptions.length) return;
+    if (audienceOptions.some((opt) => opt.value === audienceValue)) return;
+    const groupOpts = audienceOptions.filter((opt) => opt.value.startsWith('group::'));
+    // A group audience that lost its id: recover it when there is only one
+    // group to mean, rather than silently retargeting the send.
+    if (audience === 'group' && groupOpts.length === 1) {
+      setGroupId(groupOpts[0].value.slice('group::'.length));
+      return;
+    }
+    const [aud, id = ''] = String(audienceOptions[0].value).split('::');
+    setAudience(aud);
+    setGroupId(aud === 'group' ? id : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, audienceOptions, audienceValue, audience]);
+
   const selectedAudience = useMemo(
     () => audienceOptions.find((opt) => opt.value === audienceValue) || audienceOptions[0],
     [audienceOptions, audienceValue],
@@ -332,6 +354,13 @@ export default function CustomerEmailModal({
     const isSelected = audience === 'selected';
     if (!test && isSelected && !selectedEmails.length) {
       onShowToast?.('Enter at least one valid email address', 'error');
+      return;
+    }
+    // Backstop for the reconcile effect above: never let a group send leave
+    // here without an id. The server rejects it anyway, but only after the
+    // whole message has been written.
+    if (audience === 'group' && !groupId) {
+      onShowToast?.('Pick a group from the Audience list first', 'error');
       return;
     }
 
