@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
-import { BarChart2, ChevronLeft, Layers, ChevronRight, Loader2, Mail, RefreshCw, Search, Send, Users } from 'lucide-react';
+import { BarChart2, ChevronLeft, Layers, ChevronRight, Loader2, Mail, RefreshCw, Search, Send, UserX, Users } from 'lucide-react';
 import { ADMIN_REFRESH_EVENT } from '../lib/adminRefresh';
 import { lazyRetry } from '../lib/lazyRetry';
 import { BUSINESS_TYPES } from '../lib/businessTypes';
@@ -7,6 +7,7 @@ import AdminSelect from './AdminSelect';
 
 const EmailAnalyticsPanel = lazyRetry(() => import('./EmailAnalyticsPanel'));
 const EmailGroupsPanel = lazyRetry(() => import('./EmailGroupsPanel'));
+const EmailUnsubscribesPanel = lazyRetry(() => import('./EmailUnsubscribesPanel'));
 
 const PAGE_SIZE = 50;
 
@@ -170,6 +171,10 @@ export default function CommsPanel({ onCompose, onShowToast }) {
           <BarChart2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} />
           Email Analytics
         </button>
+        <button type="button" onClick={() => setTab('unsubscribed')} className={'adm-tab' + (tab === 'unsubscribed' ? ' adm-tab--active' : '')}>
+          <UserX size={14} style={{ marginRight: 6, verticalAlign: -2 }} />
+          Unsubscribed
+        </button>
         {tab === 'contacts' && (
           <>
             <AdminSelect
@@ -209,6 +214,10 @@ export default function CommsPanel({ onCompose, onShowToast }) {
       ) : tab === 'analytics' ? (
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: '#6b7280', fontSize: 13 }}><Loader2 size={16} className="spin" /> Loading Email Analytics…</div>}>
           <EmailAnalyticsPanel onShowToast={onShowToast} onCompose={onCompose} />
+        </Suspense>
+      ) : tab === 'unsubscribed' ? (
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: '#6b7280', fontSize: 13 }}><Loader2 size={16} className="spin" /> Loading unsubscribed contacts...</div>}>
+          <EmailUnsubscribesPanel onShowToast={onShowToast} />
         </Suspense>
       ) : (
         <>
