@@ -6,6 +6,10 @@ const BUCKET = 'site-config';
 const FILE = 'featured-products.json';
 const MAX_ITEMS = 100;
 
+function sameOrder(left, right) {
+  return left.length === right.length && left.every((item, index) => item.sku === right[index].sku);
+}
+
 function getAdminClient() {
   return createClient(
     process.env.VITE_SUPABASE_URL,
@@ -55,13 +59,17 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const items = normalizeItems(body.items);
       const baseUpdatedAt = body.baseUpdatedAt ? String(body.baseUpdatedAt) : null;
+      const baseItems = normalizeItems(body.baseItems);
       let conflict = null;
       // Compare-and-set through the shared mutator so two admins saving at
       // once serialize instead of silently clobbering each other's list.
       const written = await mutateSiteConfigJson(FILE, { items: [], updatedAt: null }, (store) => {
         if (baseUpdatedAt && (store?.updatedAt || null) !== baseUpdatedAt) {
-          conflict = { currentUpdatedAt: store?.updatedAt || null };
-          return { abort: true };
+          const currentItems = normalizeItems(store?.items);
+          if (!baseItems.length || !sameOrder(currentItems, baseItems)) {
+            conflict = { currentUpdatedAt: store?.updatedAt || null };
+            return { abort: true };
+          }
         }
         return { items };
       });

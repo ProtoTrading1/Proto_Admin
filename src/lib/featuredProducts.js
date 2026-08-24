@@ -11,7 +11,7 @@ export async function fetchFeaturedProducts() {
   };
 }
 
-export async function saveFeaturedProducts(items, baseUpdatedAt = null) {
+export async function saveFeaturedProducts(items, baseUpdatedAt = null, baseItems = null) {
   const normalized = (items || []).slice(0, FEATURED_HARD_CAP).map((row) => ({
     sku: String(row.sku || '').trim().toUpperCase(),
     addedAt: row.addedAt || new Date().toISOString(),
@@ -23,6 +23,7 @@ export async function saveFeaturedProducts(items, baseUpdatedAt = null) {
     body: JSON.stringify({
       items: normalized,
       ...(baseUpdatedAt ? { baseUpdatedAt } : {}),
+      ...(Array.isArray(baseItems) ? { baseItems } : {}),
     }),
   });
   const json = await res.json().catch(() => ({}));

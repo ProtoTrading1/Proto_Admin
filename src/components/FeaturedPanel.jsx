@@ -291,6 +291,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const pickSaveTimerRef = useRef(null);
   const orderSaveTimerRef = useRef(null);
   const pendingItemsRef = useRef(null);
+  const pendingBaseItemsRef = useRef(null);
 
   // The app-wide defaults are staleTime 60s, no focus refetch and no interval,
   // which suit the heavy catalogue queries. They are wrong for this one: when
@@ -383,9 +384,10 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const editSeqRef = useRef(0);
 
   const saveMutation = useMutation({
-    mutationFn: ({ items, seq }) => saveFeaturedProducts(
+    mutationFn: ({ items, seq, baseItems }) => saveFeaturedProducts(
       items,
       latestUpdatedAtRef.current || queryClient.getQueryData(queryKeys.featuredProducts())?.updatedAt || null,
+      baseItems,
     ).then((data) => ({ ...data, seq })),
     onSuccess: (data) => {
       // A response from a superseded edit must not repaint the list.
@@ -410,18 +412,22 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     pickSaveTimerRef.current = null;
     orderSaveTimerRef.current = null;
     pendingItemsRef.current = null;
+    pendingBaseItemsRef.current = null;
   }, []);
 
-  const queueSave = useCallback((items, delayMs) => {
+  const queueSave = useCallback((items, delayMs, baseItems) => {
     cancelQueuedSaves();
     setSaveState('pending');
     const seq = (editSeqRef.current += 1);
     pendingItemsRef.current = items;
+    pendingBaseItemsRef.current = baseItems;
     const timerRef = delayMs === PICK_SAVE_MS ? pickSaveTimerRef : orderSaveTimerRef;
     timerRef.current = setTimeout(() => {
       const payload = pendingItemsRef.current;
+      const baseItems = pendingBaseItemsRef.current;
       pendingItemsRef.current = null;
-      if (payload) saveMutation.mutate({ items: payload, seq });
+      pendingBaseItemsRef.current = null;
+      if (payload) saveMutation.mutate({ items: payload, seq, baseItems });
     }, delayMs);
   }, [cancelQueuedSaves, saveMutation]);
 
@@ -431,11 +437,12 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   }, []);
 
   const updateFeaturedItems = useCallback((nextItems, { delayMs = PICK_SAVE_MS } = {}) => {
+    const previousItems = queryClient.getQueryData(queryKeys.featuredProducts())?.items || [];
     queryClient.setQueryData(queryKeys.featuredProducts(), (prev) => ({
       items: nextItems,
       updatedAt: prev?.updatedAt || null,
     }));
-    queueSave(nextItems, delayMs);
+    queueSave(nextItems, delayMs, previousItems);
   }, [queryClient, queueSave]);
 
   const toggleFeatured = useCallback((sku, checked) => {
@@ -469,7 +476,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
       updatedAt: prev?.updatedAt || null,
     }));
     setSaveState('saving');
-    saveMutation.mutate({ items: next, seq });
+    saveMutation.mutate({ items: next, seq, baseItems: featuredItems });
   }, [cancelQueuedSaves, featuredItems, queryClient, saveMutation]);
 
   const handleReorder = useCallback((nextProducts) => {
