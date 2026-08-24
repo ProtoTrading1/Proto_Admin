@@ -286,6 +286,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const [categoryId, setCategoryId] = useState('');
   const [page, setPage] = useState(1);
   const [saveMeta, setSaveMeta] = useState({ updatedAt: null });
+  const latestUpdatedAtRef = useRef(null);
   const [saveState, setSaveState] = useState('saved');
   const pickSaveTimerRef = useRef(null);
   const orderSaveTimerRef = useRef(null);
@@ -312,6 +313,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
 
   useEffect(() => {
     if (featuredQuery.data?.updatedAt) {
+      latestUpdatedAtRef.current = featuredQuery.data.updatedAt;
       setSaveMeta((prev) => ({ ...prev, updatedAt: featuredQuery.data.updatedAt }));
     }
   }, [featuredQuery.data?.updatedAt]);
@@ -383,11 +385,12 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const saveMutation = useMutation({
     mutationFn: ({ items, seq }) => saveFeaturedProducts(
       items,
-      queryClient.getQueryData(queryKeys.featuredProducts())?.updatedAt || null,
+      latestUpdatedAtRef.current || queryClient.getQueryData(queryKeys.featuredProducts())?.updatedAt || null,
     ).then((data) => ({ ...data, seq })),
     onSuccess: (data) => {
       // A response from a superseded edit must not repaint the list.
       if (data.seq !== editSeqRef.current) return;
+      latestUpdatedAtRef.current = data.updatedAt;
       queryClient.setQueryData(queryKeys.featuredProducts(), { items: data.items, updatedAt: data.updatedAt });
       setSaveMeta({ updatedAt: data.updatedAt });
       setSaveState('saved');
