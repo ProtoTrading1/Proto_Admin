@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
-import { BarChart2, ChevronLeft, Layers, ChevronRight, Loader2, Mail, RefreshCw, Search, Send, Users } from 'lucide-react';
+import { BarChart2, ChevronLeft, Layers, ChevronRight, Loader2, Mail, RefreshCw, Search, Send, UserX, Users } from 'lucide-react';
 import { ADMIN_REFRESH_EVENT } from '../lib/adminRefresh';
 import { lazyRetry } from '../lib/lazyRetry';
 import { BUSINESS_TYPES } from '../lib/businessTypes';
@@ -7,20 +7,21 @@ import AdminSelect from './AdminSelect';
 
 const EmailAnalyticsPanel = lazyRetry(() => import('./EmailAnalyticsPanel'));
 const EmailGroupsPanel = lazyRetry(() => import('./EmailGroupsPanel'));
+const EmailUnsubscribesPanel = lazyRetry(() => import('./EmailUnsubscribesPanel'));
 
 const PAGE_SIZE = 50;
 
 // Same strictness the composer uses (parseEmailList) so a contact that can't be
-// sent to can't be ticked — keeps the "Email selected (N)" count truthful.
+// sent to can't be ticked â€” keeps the "Email selected (N)" count truthful.
 const SENDABLE_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 function isSendableEmail(email) {
   return SENDABLE_EMAIL_RE.test(email);
 }
 
 function formatWhen(value) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return 'â€”';
   return date.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
@@ -29,19 +30,19 @@ function contactEmail(c) {
 }
 
 function contactBusiness(c) {
-  return c?.business_name || c?.name || '—';
+  return c?.business_name || c?.name || 'â€”';
 }
 
 function contactPerson(c) {
-  return c?.contact_name || c?.first_name || '—';
+  return c?.contact_name || c?.first_name || 'â€”';
 }
 
 function contactLocation(c) {
-  return [c?.city, c?.province].filter(Boolean).join(', ') || '—';
+  return [c?.city, c?.province].filter(Boolean).join(', ') || 'â€”';
 }
 
 /**
- * Email CRM (comms) — one place for customer email work, sourced from the
+ * Email CRM (comms) â€” one place for customer email work, sourced from the
  * SITE's own approved customers (portal `customers` table via api/admin-customers),
  * not Brevo. Filter by business type, select contacts, and send targeted
  * campaigns through the existing composer. Analytics tab embeds the existing
@@ -133,7 +134,7 @@ export default function CommsPanel({ onCompose, onShowToast }) {
     });
   };
 
-  const audienceLabel = businessType ? `all approved · ${businessType}` : 'all approved';
+  const audienceLabel = businessType ? `all approved Â· ${businessType}` : 'all approved';
 
   return (
     <div className="adm-panel">
@@ -141,7 +142,7 @@ export default function CommsPanel({ onCompose, onShowToast }) {
         <div>
           <h2 className="adm-section-title">Email CRM</h2>
           <p className="adm-section-note">
-            Your approved site customers. Filter by business type, tick the ones you want, and send — or email a whole
+            Your approved site customers. Filter by business type, tick the ones you want, and send â€” or email a whole
             audience. Contacts come straight from the portal, not Brevo.
           </p>
         </div>
@@ -170,6 +171,10 @@ export default function CommsPanel({ onCompose, onShowToast }) {
           <BarChart2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} />
           Email Analytics
         </button>
+        <button type="button" onClick={() => setTab('unsubscribed')} className={`adm-tab${tab === 'unsubscribed' ? ' adm-tab--active' : ''}`}>
+          <UserX size={14} style={{ marginRight: 6, verticalAlign: -2 }} />
+          Unsubscribed
+        </button>
         {tab === 'contacts' && (
           <>
             <AdminSelect
@@ -183,7 +188,7 @@ export default function CommsPanel({ onCompose, onShowToast }) {
             />
             <label className="adm-search adm-search--inline">
               <Search size={14} />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email, business…" className="adm-search-input" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email, businessâ€¦" className="adm-search-input" />
             </label>
             <button
               type="button"
@@ -200,15 +205,19 @@ export default function CommsPanel({ onCompose, onShowToast }) {
       </div>
 
       {tab === 'groups' ? (
-        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: '#6b7280', fontSize: 13 }}><Loader2 size={16} className="spin" /> Loading Groups…</div>}>
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: '#6b7280', fontSize: 13 }}><Loader2 size={16} className="spin" /> Loading Groupsâ€¦</div>}>
           <EmailGroupsPanel
             onShowToast={onShowToast}
             onEmailGroup={(group) => onCompose?.({ audience: 'group', groupId: group.id })}
           />
         </Suspense>
       ) : tab === 'analytics' ? (
-        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: '#6b7280', fontSize: 13 }}><Loader2 size={16} className="spin" /> Loading Email Analytics…</div>}>
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: '#6b7280', fontSize: 13 }}><Loader2 size={16} className="spin" /> Loading Email Analyticsâ€¦</div>}>
           <EmailAnalyticsPanel onShowToast={onShowToast} onCompose={onCompose} />
+        </Suspense>
+      ) : tab === 'unsubscribed' ? (
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 4px', color: '#6b7280', fontSize: 13 }}><Loader2 size={16} className="spin" /> Loading unsubscribed contacts...</div>}>
+          <EmailUnsubscribesPanel onShowToast={onShowToast} />
         </Suspense>
       ) : (
         <>
@@ -271,8 +280,8 @@ export default function CommsPanel({ onCompose, onShowToast }) {
                   </span>
                   <div data-label="Business" style={{ fontSize: 13, fontWeight: 600 }}>{contactBusiness(c)}</div>
                   <div data-label="Contact" style={{ fontSize: 13 }}>{contactPerson(c)}</div>
-                  <div data-label="Email" style={{ fontSize: 12, wordBreak: 'break-all', color: hasEmail ? undefined : '#94a3b8' }}>{email || '— no email —'}</div>
-                  <div data-label="Type" className="adm-muted" style={{ fontSize: 12 }}>{c.business_type || '—'}</div>
+                  <div data-label="Email" style={{ fontSize: 12, wordBreak: 'break-all', color: hasEmail ? undefined : '#94a3b8' }}>{email || 'â€” no email â€”'}</div>
+                  <div data-label="Type" className="adm-muted" style={{ fontSize: 12 }}>{c.business_type || 'â€”'}</div>
                   <div data-label="Location" className="adm-muted" style={{ fontSize: 12 }}>{contactLocation(c)}</div>
                   <div data-label="Last emailed" className="adm-muted" style={{ fontSize: 12 }} title={c.last_email_type ? `Last: ${c.last_email_type}` : ''}>{formatWhen(c.last_email_at)}</div>
                 </div>
@@ -285,7 +294,7 @@ export default function CommsPanel({ onCompose, onShowToast }) {
             )}
             {loading && rows.length === 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 16px', color: '#6b7280', fontSize: 13 }}>
-                <Loader2 size={16} className="spin" /> Loading contacts…
+                <Loader2 size={16} className="spin" /> Loading contactsâ€¦
               </div>
             )}
           </div>
@@ -306,3 +315,4 @@ export default function CommsPanel({ onCompose, onShowToast }) {
     </div>
   );
 }
+
