@@ -30,6 +30,8 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [loading, setLoading] = useState(false);
+  const [manualEmail, setManualEmail] = useState('');
+  const [savingManualEmail, setSavingManualEmail] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search.trim()), 300);
@@ -69,6 +71,33 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
     return () => window.removeEventListener(ADMIN_REFRESH_EVENT, onRefresh);
   }, [load, page, searchDebounced]);
 
+  async function handleAddManualEmail(event) {
+    event.preventDefault();
+    const email = manualEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      onShowToast?.('Enter a valid email address', 'error');
+      return;
+    }
+    setSavingManualEmail(true);
+    try {
+      const res = await fetch('/api/email-unsubscribes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to add unsubscribed email');
+      setManualEmail('');
+      onShowToast?.('Email added to unsubscribed contacts', 'success');
+      await load(1, searchDebounced);
+      setPage(1);
+    } catch (err) {
+      onShowToast?.(err.message || 'Failed to add unsubscribed email', 'error');
+    } finally {
+      setSavingManualEmail(false);
+    }
+  }
+
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
   return (
@@ -83,11 +112,15 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <form onSubmit={handleAddManualEmail} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} placeholder="Add email manually..." type="email" className="adm-search-input" style={{ minWidth: 190, border: '1px solid #d1d5db', borderRadius: 4, padding: '7px 9px' }} aria-label="Add email manually" />
+            <button type="submit" className="adm-btn-ghost" disabled={savingManualEmail || !manualEmail.trim()}>{savingManualEmail ? 'Adding...' : 'Add'}</button>
+          </form>
           <label className="adm-search adm-search--inline">
             <Search size={14} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search email..." className="adm-search-input" />
           </label>
-          <button type="button" className="adm-btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => void load(page, searchDebounced)} disabled={loading} title="Reload unsubscribed contacts">
+          <button type="button" className="adm-btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => void load(page, searchDebounced)} disabled={loading || savingManualEmail} title="Reload unsubscribed contacts">
             {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
           </button>
         </div>

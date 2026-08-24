@@ -15,8 +15,43 @@ export default async function handler(req, res) {
   if (!(await requireAdminKey(req, res))) return;
   res.setHeader('Cache-Control', 'no-store');
 
+  if (req.method === 'POST') {
+    let body = req.body || {};
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = {}; }
+    }
+
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'A valid email address is required' });
+    }
+
+    try {
+      const sb = getPortalDbClient();
+      const { data: existing, error: lookupError } = await sb
+        .from('marketing_email_opt_outs')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+      if (existing) return res.status(409).json({ error: 'That email is already unsubscribed' });
+
+      const { error } = await sb.from('marketing_email_opt_outs').insert({
+        email,
+        source: 'manual_admin',
+        unsubscribed_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+
+      return res.status(201).json({ email });
+    } catch (err) {
+      console.error('email-unsubscribes:', err?.message || err);
+      return res.status(500).json({ error: err.message || 'Failed to add unsubscribed email' });
+    }
+  }
+
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
+    res.setHeader('Allow', 'GET, POST');
     return res.status(405).end();
   }
 
