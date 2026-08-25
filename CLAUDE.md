@@ -60,6 +60,16 @@ internal-only and can never reach a customer number. Do not delete it as
   shown as a badge in Customer Management.
 - **Per-template test send**: `api/email-test-send.js` (welcome, campaign,
   order_confirmation, trade_application) → `EmailTemplateTests` in the email modal.
+- **Unsubscribe link**: broadcasts send raw `htmlContent`, where Brevo's own
+  `{{ unsubscribe }}` tag does not resolve — so the composer offers an
+  **Unsubscribe** chip that inserts `{{unsubscribe}}` (a small muted text link)
+  or `{{unsubscribe_url}}` (bare URL for custom markup). Both are resolved by
+  `injectUnsubscribeTags` **after** the body is assembled, so they survive the
+  intro block's HTML escaping. Destination is `UNSUBSCRIBE_URL`
+  (`VITE_UNSUBSCRIBE_URL` for the preview), defaulting to a `mailto:` so the
+  link is never dead. Nothing is appended automatically. Brevo's own
+  `List-Unsubscribe` header is left untouched — overriding it would replace
+  Brevo's working suppression list with an unverified page.
 - **Brevo analytics**: opens/clicks flow via `api/brevo-email-webhook.js`. Set
   `WEBHOOK_SECRET` in Vercel and configure Brevo to send the same value as the
   `X-Webhook-Secret` header (or Bearer token). The endpoint fails closed when
