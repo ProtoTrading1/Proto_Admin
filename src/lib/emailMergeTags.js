@@ -2,16 +2,24 @@
 // falls back to the business name, then the email) so it is never blank.
 // customer/account codes were removed — they are usually empty (codes are
 // allocated manually), so a {{customer_code}} tag rendered blank.
+const UNSUBSCRIBE_SAMPLE = 'https://admin.proto.co.za/api/email-unsubscribe?preview=1';
+
 export const MERGE_TAGS = [
   { key: 'name', label: 'Name', sample: 'Jane Smith' },
   { key: 'business_name', label: 'Business name', sample: 'ABC Stationers' },
   { key: 'email', label: 'Email', sample: 'jane@abcstationers.co.za' },
-  { key: 'unsubscribe', label: 'Unsubscribe link', sample: 'https://admin.proto.co.za/api/email-unsubscribe?preview=1' },
-  { key: 'unsubscribe_url', label: 'Unsubscribe link', sample: 'https://admin.proto.co.za/api/email-unsubscribe?preview=1' },
+  { key: 'unsubscribe', label: 'Unsubscribe link', sample: UNSUBSCRIBE_SAMPLE },
 ];
 
+// {{unsubscribe_url}} is the same signed URL under an older name. Templates
+// written before the two were unified still contain it, so it must keep
+// resolving — but it gets no chip of its own, because a second button reading
+// "Unsubscribe link" and inserting an identical value is only a way to pick
+// wrong.
+const ALIAS_TAGS = [{ key: 'unsubscribe_url', sample: UNSUBSCRIBE_SAMPLE }];
+
 export const PREVIEW_MERGE_VARS = Object.fromEntries(
-  MERGE_TAGS.map(({ key, sample }) => [key, sample]),
+  [...MERGE_TAGS, ...ALIAS_TAGS].map(({ key, sample }) => [key, sample]),
 );
 
 export function applyMergeTags(template, vars = {}) {
