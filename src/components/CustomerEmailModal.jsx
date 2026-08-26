@@ -76,17 +76,6 @@ function MergeTagBar({ onInsert }) {
             {label}
           </button>
         ))}
-        {/* Not a personalization field: it renders a link, not a value. Kept
-            alongside the others because this bar is where you reach for
-            "something the send fills in for me". */}
-        <button
-          type="button"
-          className="adm-email-merge-chip"
-          onClick={() => onInsert('{{unsubscribe}}')}
-          title="Insert an unsubscribe link. Use {{unsubscribe_url}} for the bare URL in your own markup."
-        >
-          Unsubscribe
-        </button>
       </div>
     </div>
   );
@@ -303,11 +292,7 @@ export default function CustomerEmailModal({
   );
 
   const previewBodyHtml = useMemo(
-    () => buildEmailBodyHtml(
-      { introText: introBody, htmlBlock: htmlBody },
-      PREVIEW_MERGE_VARS,
-      { unsubscribeUrl: PROTO_URLS.unsubscribe },
-    )
+    () => buildEmailBodyHtml({ introText: introBody, htmlBlock: htmlBody }, PREVIEW_MERGE_VARS)
       || '<p style="color:#9ca3af;margin:0;">Write a message body and/or HTML block to preview.</p>',
     [introBody, htmlBody],
   );

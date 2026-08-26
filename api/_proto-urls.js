@@ -12,11 +12,4 @@ export const PROTO_URLS = {
   // proto.co.za, so every link we mail out must land there. Keep this separate
   // from `site` — flipping the API base by accident breaks order notifications.
   publicSite: (process.env.PUBLIC_SITE_URL || 'https://proto.co.za').replace(/\/$/, ''),
-
-  // Where an {{unsubscribe}} link in a broadcast points. Brevo cannot hand us a
-  // hosted per-recipient unsubscribe URL for raw transactional htmlContent (its
-  // own {{ unsubscribe }} tag only resolves inside Brevo's campaign editor), so
-  // the destination is ours to choose. Defaults to a mailto: so the link is
-  // never dead out of the box; set UNSUBSCRIBE_URL to a real page to upgrade it.
-  unsubscribe: (process.env.UNSUBSCRIBE_URL || 'mailto:online@proto.co.za?subject=Unsubscribe').trim(),
 };

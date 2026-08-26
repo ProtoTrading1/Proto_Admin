@@ -41,42 +41,11 @@ function htmlToText(html) {
     .trim();
 }
 
-// Keep in sync with src/lib/emailMergeTags.js (the preview version).
-// Unsubscribe resolves to markup, not text, and the intro block escapes
-// everything it renders — so it is held back here and substituted into the
-// assembled body by injectUnsubscribeTags. Without this guard the generic
-// "unknown key -> empty string" rule would strip it and ship href="".
-export const UNSUBSCRIBE_TAGS = ['unsubscribe', 'unsubscribe_url'];
-const RESERVED_TAGS = new Set(UNSUBSCRIBE_TAGS);
-
 export function applyMergeTags(template, vars = {}) {
-  return String(template ?? '').replace(/\{\{\s*([\w.]+)\s*\}\}/gi, (match, key) => {
-    const name = String(key).toLowerCase();
-    if (RESERVED_TAGS.has(name) && vars[name] == null) return match;
-    const value = vars[name];
+  return String(template ?? '').replace(/\{\{\s*([\w.]+)\s*\}\}/gi, (_, key) => {
+    const value = vars[String(key).toLowerCase()];
     return value != null ? String(value) : '';
   });
-}
-
-export function buildUnsubscribeUrl(baseUrl, email = '') {
-  const base = String(baseUrl || '').trim();
-  if (!base) return '';
-  const address = String(email || '').trim();
-  if (!address) return base;
-  const key = base.startsWith('mailto:') ? 'body' : 'email';
-  return `${base}${base.includes('?') ? '&' : '?'}${key}=${encodeURIComponent(address)}`;
-}
-
-export function buildUnsubscribeLinkHtml(url) {
-  if (!url) return '';
-  return `<a href="${escapeHtml(url)}" style="color:#9ca3af;font-size:12px;text-decoration:underline;">Unsubscribe</a>`;
-}
-
-export function injectUnsubscribeTags(html, { unsubscribeUrl = '', email = '' } = {}) {
-  const url = buildUnsubscribeUrl(unsubscribeUrl, email);
-  return String(html ?? '').replace(/\{\{\s*(unsubscribe_url|unsubscribe)\s*\}\}/gi, (_, key) => (
-    String(key).toLowerCase() === 'unsubscribe_url' ? escapeHtml(url) : buildUnsubscribeLinkHtml(url)
-  ));
 }
 
 export function buildRecipientVars(recipient = {}) {
@@ -106,41 +75,28 @@ export const TEST_MERGE_VARS = {
   phone: '082 555 1234',
 };
 
-export function buildComposedEmail(
-  { subject, introText = '', htmlBlock = '' },
-  vars = {},
-  { unsubscribeUrl = PROTO_URLS.unsubscribe } = {},
-) {
+export function buildComposedEmail({ subject, introText = '', htmlBlock = '' }, vars = {}) {
   const personalizedSubject = applyMergeTags(subject, vars);
   const intro = introText.trim();
   const html = htmlBlock.trim();
   const introHtml = intro ? plainToHtml(applyMergeTags(intro, vars)) : '';
   const htmlPart = html ? stripDangerousHtml(applyMergeTags(html, vars)) : '';
-  const composedBody = [introHtml, htmlPart].filter(Boolean).join('\n') || '<p></p>';
-  const bodyHtml = injectUnsubscribeTags(composedBody, { unsubscribeUrl, email: vars.email });
-  const textContent = buildComposedText({ introText, htmlBlock }, vars, { unsubscribeUrl });
+  const bodyHtml = [introHtml, htmlPart].filter(Boolean).join('\n') || '<p></p>';
+  const textContent = buildComposedText({ introText, htmlBlock }, vars);
   const htmlContent = wrapBroadcastHtml({ subject: personalizedSubject, bodyHtml });
   return { subject: personalizedSubject, htmlContent, textContent, bodyHtml };
 }
 
-export function buildComposedText(
-  { introText = '', htmlBlock = '' },
-  vars = {},
-  { unsubscribeUrl = PROTO_URLS.unsubscribe } = {},
-) {
+export function buildComposedText({ introText = '', htmlBlock = '' }, vars = {}) {
   const parts = [];
   if (introText.trim()) parts.push(applyMergeTags(introText, vars));
   if (htmlBlock.trim()) parts.push(htmlToText(applyMergeTags(htmlBlock, vars)));
-  const text = parts.join('\n\n').trim();
-  // Bare URL in the text alternative — an <a> would flatten to its label alone.
-  const url = buildUnsubscribeUrl(unsubscribeUrl, vars.email);
-  return text.replace(/\{\{\s*(?:unsubscribe_url|unsubscribe)\s*\}\}/gi, url);
+  return parts.join('\n\n').trim();
 }
 
 export function wrapBroadcastHtml({ subject, bodyHtml }) {
   const safeBody = bodyHtml || '<p>Hello from Proto Trading.</p>';
-  // No automatic footer/button — the email ends with the composed body.
-  // An unsubscribe link is opt-in per send via the {{unsubscribe}} tag.
+  // No footer/button — the email ends with the composed body.
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;margin:0 auto;padding:24px;">
   ${safeBody}
 </body></html>`;
