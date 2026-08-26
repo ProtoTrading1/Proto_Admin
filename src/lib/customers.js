@@ -150,13 +150,15 @@ export async function pushPortalCustomersToBrevo() {
 }
 
 export async function sendCustomerEmailBroadcast({
-  audience, subject, introText, htmlBlock, testEmail, businessTypes, recipients, importBatch,
+  audience, subject, introText, htmlBlock, testEmail, businessTypes, recipients, importBatch, groupId,
 }) {
   const res = await fetch('/api/customer-email-broadcast', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      audience, subject, introText, htmlBlock, testEmail, businessTypes, recipients, importBatch,
+      // groupId MUST be forwarded: the API rejects audience 'group' without it,
+      // so dropping it here fails every group send with "Choose a group to send to."
+      audience, subject, introText, htmlBlock, testEmail, businessTypes, recipients, importBatch, groupId,
     }),
   });
   const json = await res.json();
