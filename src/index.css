@@ -3053,6 +3053,30 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
   font-size: 16px;
 }
 
+.featured-load-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 12px;
+}
+
+.featured-load-warning span {
+  flex: 1;
+}
+
+@media (max-width: 700px) {
+  .featured-load-warning {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .featured-order-guide {
   display: flex;
   align-items: center;

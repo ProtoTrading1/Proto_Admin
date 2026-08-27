@@ -32,6 +32,8 @@ import { formatSortSavedAt } from '../lib/sortOrderStore';
 import { formatWebsitePrice } from '../lib/pricing';
 import { isReadOnlyPreviewHost } from '../lib/previewWriteGuard';
 
+const FEATURED_DRAFT_QUERY_KEY = ['featured-products', 'unsaved-draft'];
+
 export function dispatchFeaturedSave({ previewSimulation = false, items = [], onPreview, onLive } = {}) {
   if (previewSimulation) {
     onPreview?.(items);
@@ -43,6 +45,10 @@ export function dispatchFeaturedSave({ previewSimulation = false, items = [], on
 
 export function hasFeaturedChanges(savedItems = [], draftItems = []) {
   return savedItems.map((item) => item.sku).join('\n') !== draftItems.map((item) => item.sku).join('\n');
+}
+
+export function canEditFeaturedList({ isSuccess = false, updatedAt = null } = {}) {
+  return isSuccess && Boolean(updatedAt);
 }
 
 const LINK_BTN = {
@@ -308,7 +314,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const orderSaveTimerRef = useRef(null);
   const pendingItemsRef = useRef(null);
   const pendingBaseItemsRef = useRef(null);
-  const [draftItems, setDraftItems] = useState(null);
+  const [draft, setDraft] = useState(() => queryClient.getQueryData(FEATURED_DRAFT_QUERY_KEY) || null);
 
   // The app-wide defaults are staleTime 60s, no focus refetch and no interval,
   // which suit the heavy catalogue queries. They are wrong for this one: when
@@ -320,12 +326,19 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     queryFn: fetchFeaturedProducts,
     staleTime: 0,
     refetchOnMount: 'always',
-    refetchOnWindowFocus: draftItems === null && (saveState === 'saved' || saveState === 'error'),
+    refetchOnWindowFocus: draft === null && (saveState === 'saved' || saveState === 'error'),
   });
 
   const savedFeaturedItems = featuredQuery.data?.items || [];
-  const featuredItems = draftItems ?? savedFeaturedItems;
+  const featuredItems = draft?.items ?? savedFeaturedItems;
   const hasUnsavedChanges = hasFeaturedChanges(savedFeaturedItems, featuredItems);
+  // The production list always has an updatedAt token. A successful-looking
+  // response without one can be the storage layer's empty fallback, so never
+  // let that state become the basis for replacing the real list.
+  const featuredListReady = canEditFeaturedList({
+    isSuccess: featuredQuery.isSuccess,
+    updatedAt: featuredQuery.data?.updatedAt,
+  });
   const featuredSkuSet = useMemo(
     () => new Set(featuredItems.map((item) => item.sku)),
     [featuredItems],
@@ -400,9 +413,9 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const editSeqRef = useRef(0);
 
   const saveMutation = useMutation({
-    mutationFn: ({ items, seq, baseItems }) => saveFeaturedProducts(
+    mutationFn: ({ items, seq, baseUpdatedAt, baseItems }) => saveFeaturedProducts(
       items,
-      latestUpdatedAtRef.current || queryClient.getQueryData(queryKeys.featuredProducts())?.updatedAt || null,
+      baseUpdatedAt,
       baseItems,
     ).then((data) => ({ ...data, seq })),
     onSuccess: (data) => {
@@ -410,7 +423,8 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
       if (data.seq !== editSeqRef.current) return;
       latestUpdatedAtRef.current = data.updatedAt;
       queryClient.setQueryData(queryKeys.featuredProducts(), { items: data.items, updatedAt: data.updatedAt });
-      setDraftItems(null);
+      queryClient.removeQueries({ queryKey: FEATURED_DRAFT_QUERY_KEY, exact: true });
+      setDraft(null);
       setSaveMeta({ updatedAt: data.updatedAt });
       setSaveState('saved');
     },
@@ -430,11 +444,29 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     pendingBaseItemsRef.current = null;
   }, []);
 
-  const queueSave = useCallback((items, delayMs, baseItems) => {
+  const updateDraftItems = useCallback((items) => {
+    const next = {
+      items,
+      baseUpdatedAt: draft?.baseUpdatedAt || featuredQuery.data?.updatedAt || null,
+    };
+    queryClient.setQueryData(FEATURED_DRAFT_QUERY_KEY, next);
+    setDraft(next);
+    setSaveState(previewSimulation ? 'preview' : 'saved');
+  }, [draft?.baseUpdatedAt, featuredQuery.data?.updatedAt, previewSimulation, queryClient]);
+
+  const clearDraft = useCallback(() => {
+    cancelQueuedSaves();
+    queryClient.removeQueries({ queryKey: FEATURED_DRAFT_QUERY_KEY, exact: true });
+    setDraft(null);
+    setSaveState(previewSimulation ? 'preview' : 'saved');
+  }, [cancelQueuedSaves, previewSimulation, queryClient]);
+
+  const saveDraft = useCallback(() => {
+    if (!hasUnsavedChanges || !featuredListReady) return;
     cancelQueuedSaves();
     dispatchFeaturedSave({
       previewSimulation,
-      items,
+      items: featuredItems,
       onPreview: () => {
         setSaveState('preview');
         onShowToast?.('Preview only — no website or backend changes were saved.', 'success');
@@ -442,34 +474,20 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
       onLive: () => {
         setSaveState('saving');
         const seq = (editSeqRef.current += 1);
-        pendingItemsRef.current = items;
-        pendingBaseItemsRef.current = baseItems;
-        const timerRef = delayMs === PICK_SAVE_MS ? pickSaveTimerRef : orderSaveTimerRef;
-        timerRef.current = setTimeout(() => {
-          const payload = pendingItemsRef.current;
-          const pendingBaseItems = pendingBaseItemsRef.current;
-          pendingItemsRef.current = null;
-          pendingBaseItemsRef.current = null;
-          if (payload) saveMutation.mutate({ items: payload, seq, baseItems: pendingBaseItems });
-        }, delayMs);
+        saveMutation.mutate({
+          items: featuredItems,
+          seq,
+          baseUpdatedAt: draft?.baseUpdatedAt || featuredQuery.data?.updatedAt || null,
+          baseItems: savedFeaturedItems,
+        });
       },
     });
-  }, [cancelQueuedSaves, onShowToast, previewSimulation, saveMutation]);
+  }, [cancelQueuedSaves, draft?.baseUpdatedAt, featuredItems, featuredListReady, featuredQuery.data?.updatedAt, hasUnsavedChanges, onShowToast, previewSimulation, saveMutation, savedFeaturedItems]);
 
   useEffect(() => () => {
     if (pickSaveTimerRef.current) clearTimeout(pickSaveTimerRef.current);
     if (orderSaveTimerRef.current) clearTimeout(orderSaveTimerRef.current);
   }, []);
-
-  const updateFeaturedItems = useCallback((nextItems, { saveImmediately = false, delayMs = PICK_SAVE_MS } = {}) => {
-    setDraftItems(nextItems);
-    if (saveImmediately) queueSave(nextItems, delayMs, savedFeaturedItems);
-  }, [queueSave, savedFeaturedItems]);
-
-  const saveDraft = useCallback(() => {
-    if (!hasUnsavedChanges) return;
-    queueSave(featuredItems, 0, savedFeaturedItems);
-  }, [featuredItems, hasUnsavedChanges, queueSave, savedFeaturedItems]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return undefined;
@@ -482,6 +500,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   }, [hasUnsavedChanges]);
 
   const toggleFeatured = useCallback((sku, checked) => {
+    if (!featuredListReady) return;
     const normalized = String(sku || '').trim().toUpperCase();
     if (!normalized) return;
     if (checked) {
@@ -490,27 +509,28 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         onShowToast?.(`Maximum ${FEATURED_HARD_CAP} featured products`, 'error');
         return;
       }
-      updateFeaturedItems([
+      updateDraftItems([
         ...featuredItems,
         { sku: normalized, addedAt: new Date().toISOString() },
       ]);
       return;
     }
-    updateFeaturedItems(featuredItems.filter((item) => item.sku !== normalized));
-  }, [featuredItems, featuredSkuSet, onShowToast, updateFeaturedItems]);
+    updateDraftItems(featuredItems.filter((item) => item.sku !== normalized));
+  }, [featuredItems, featuredListReady, featuredSkuSet, onShowToast, updateDraftItems]);
 
   const removeFeatured = useCallback((sku) => {
+    if (!featuredListReady) return;
     const normalized = String(sku || '').trim().toUpperCase();
     if (!window.confirm(`Remove ${normalized} from featured products?`)) return;
-    updateFeaturedItems(featuredItems.filter((item) => item.sku !== normalized));
-  }, [featuredItems, updateFeaturedItems]);
+    updateDraftItems(featuredItems.filter((item) => item.sku !== normalized));
+  }, [featuredItems, featuredListReady, updateDraftItems]);
 
   const handleReorder = useCallback((nextProducts) => {
     const skuOrder = nextProducts.map((p) => p.sku);
     const bySku = new Map(featuredItems.map((item) => [item.sku, item]));
     const nextItems = skuOrder.map((sku) => bySku.get(sku)).filter(Boolean);
-    setDraftItems(nextItems);
-  }, [featuredItems]);
+    updateDraftItems(nextItems);
+  }, [featuredItems, updateDraftItems]);
 
   const slotsRemaining = Math.max(0, FEATURED_SOFT_CAP - featuredItems.length);
   const overSoftCap = featuredItems.length > FEATURED_SOFT_CAP;
@@ -570,8 +590,8 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         <button
           type="button"
           className="adm-btn-ghost adm-btn--sm"
-          onClick={() => setDraftItems(null)}
-          disabled={!hasUnsavedChanges || saving}
+          onClick={clearDraft}
+          disabled={!hasUnsavedChanges || saving || !featuredListReady}
         >
           <RotateCcw size={14} /> Undo changes
         </button>
@@ -579,7 +599,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
           type="button"
           className="adm-btn-green adm-btn--sm"
           onClick={saveDraft}
-          disabled={!hasUnsavedChanges || saving}
+          disabled={!hasUnsavedChanges || saving || !featuredListReady}
         >
           {saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
           {previewSimulation ? 'Test save safely' : 'Save changes'}
@@ -590,6 +610,16 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         <p className="adm-section-note" style={{ color: '#b45309', marginBottom: 12 }}>
           {FEATURED_SOFT_CAP} recommended for the home page — currently {featuredItems.length}.
         </p>
+      )}
+
+      {featuredQuery.isSuccess && !featuredListReady && (
+        <div className="featured-load-warning" role="alert">
+          <strong>The existing Featured list could not be verified.</strong>
+          <span>Editing is disabled so the current website list cannot be overwritten.</span>
+          <button type="button" className="adm-btn-ghost adm-btn--sm" onClick={() => featuredQuery.refetch()}>
+            Try loading again
+          </button>
+        </div>
       )}
 
       <section className="featured-workspace-section" aria-labelledby="featured-current-heading">
@@ -630,7 +660,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
                 products={orderedFeaturedProducts}
                 onReorder={handleReorder}
                 onRemove={removeFeatured}
-                saving={saving}
+                saving={saving || !featuredListReady}
               />
             </>
           )}
@@ -698,7 +728,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
                       <button
                         type="button"
                         className={`featured-pick-action${checked ? ' featured-pick-action--selected' : ''}`}
-                        disabled={saving}
+                        disabled={saving || !featuredListReady}
                         onClick={() => toggleFeatured(product.sku, !checked)}
                         aria-label={`${checked ? 'Remove' : 'Add'} ${product.name} ${checked ? 'from' : 'to'} featured products`}
                       >

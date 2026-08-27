@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  canEditFeaturedList,
   dispatchFeaturedSave,
   hasFeaturedChanges,
   moveFlatListItem,
@@ -61,6 +62,12 @@ describe('featured storefront order grid', () => {
     expect(hasFeaturedChanges(products, [products[1], products[0], products[2], products[3]])).toBe(true);
     expect(hasFeaturedChanges(products, products.slice(0, 3))).toBe(true);
     expect(hasFeaturedChanges(products, [...products, { id: 'E', sku: 'E' }])).toBe(true);
+  });
+
+  it('blocks editing when the existing list has no verified save token', () => {
+    expect(canEditFeaturedList({ isSuccess: false, updatedAt: null })).toBe(false);
+    expect(canEditFeaturedList({ isSuccess: true, updatedAt: null })).toBe(false);
+    expect(canEditFeaturedList({ isSuccess: true, updatedAt: '2026-08-27T10:00:00.000Z' })).toBe(true);
   });
 
   it('persists the exact visual sequence consumed by the live portal', async () => {
