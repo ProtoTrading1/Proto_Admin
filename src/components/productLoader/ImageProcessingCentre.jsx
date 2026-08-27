@@ -349,15 +349,16 @@ export default function ImageProcessingCentre({
   const [repairModeJobId, setRepairModeJobId] = useState('');
   const [repairDraft, setRepairDraft] = useState(null);
   const [repairConfirmation, setRepairConfirmation] = useState(false);
+
   const summary = useMemo(() => summarizeImageProcessingJobs(jobs), [jobs]);
+  const selectedJob = jobs.find((job) => job.id === selectedJobId) || jobs[0] || null;
+  const selectedJobExecutionAuthorized = selectedJob
+    ? executionAuthorizationRef.current.has(selectedJob.id)
+    : false;
   const hasActiveJobs = jobs.some((job) => ACTIVE_STATUSES.has(job.status));
   const archivedJobs = jobs.filter((job) => ['archived', 'published', 'restored'].includes(job.status));
   const queuedJobs = jobs.filter((job) => !['archived', 'published', 'restored'].includes(job.status));
   const visibleJobs = queueView === 'archive' ? archivedJobs : queuedJobs;
-  const selectedJob = visibleJobs.find((job) => job.id === selectedJobId) || visibleJobs[0] || null;
-  const selectedJobExecutionAuthorized = selectedJob
-    ? executionAuthorizationRef.current.has(selectedJob.id)
-    : false;
   const workflowStep = selectedJob
     ? (['review', 'ready', 'completed'].includes(selectedJob.status)
       ? 3
@@ -1020,11 +1021,7 @@ export default function ImageProcessingCentre({
               <strong>Loading private image queue</strong>
               <span>Checking staged uploads, review items and archive records. Nothing is applied to Product Manager during this load.</span>
             </div>
-          ) : queueView === 'archive' && archivedJobs.length ? (
-            archivedJobs.map((job) => (
-              <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
-            ))
-          ) : queueView === 'queue' && queuedJobs.length ? queuedJobs.map((job) => (
+          ) : visibleJobs.length ? visibleJobs.map((job) => (
             <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
           )) : (
             <div className="ipc-empty">{queueView === 'archive' ? <Archive size={22} /> : <Sparkles size={22} />}<strong>{queueView === 'archive' ? 'No archived images yet' : 'No images queued'}</strong><span>{queueView === 'archive' ? 'Reviewed results saved here stay private and separate from processing assets.' : 'Add selected Nutstore images or upload a folder to begin.'}</span><small>{queueView === 'archive' ? 'Archive is private until you explicitly apply an approved image.' : 'Choose a treatment above, then add your first image to start.'}</small></div>
