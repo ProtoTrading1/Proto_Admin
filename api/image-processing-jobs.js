@@ -100,6 +100,7 @@ function publicImageJob(job, image) {
     error: image.error || '',
     created_at: image.createdAt || job.createdAt,
     updated_at: job.updatedAt,
+    archived_at: image.archivedAt || image.archive?.destinationSnapshot?.capturedAt || '',
   };
 }
 

@@ -72,6 +72,14 @@ describe('Image Processing Centre API adapter', () => {
     })).toMatchObject({ displayedAssetId: 'ipc_asset_123' });
   });
 
+  it('retains the server archive timestamp used to classify legacy records', () => {
+    expect(normalizeImageProcessingJob({
+      id: 'archived-1',
+      status: 'archived',
+      archived_at: '2026-08-27T07:30:00.000Z',
+    })).toMatchObject({ archivedAt: '2026-08-27T07:30:00.000Z' });
+  });
+
   it('separates images archived today from the older archive in Johannesburg time', () => {
     const { newlyArchivedJobs, olderArchiveJobs } = splitImageArchiveJobs([
       {
@@ -98,6 +106,9 @@ describe('Image Processing Centre API adapter', () => {
     expect(centreSource).toContain('Images Catherine has just saved');
     expect(centreSource).toContain('Older archive');
     expect(stylesheetSource).toContain('.ipc-archive-group-head--new');
+    expect(centreSource).toContain('aria-pressed={selected}');
+    expect(centreSource).toContain("const visibleJobs = queueView === 'archive'");
+    expect(centreSource).toContain('window.setInterval(() => setArchiveNow(new Date()), 60_000)');
   });
 
   it('creates Nutstore batches through the flat collection endpoint', async () => {

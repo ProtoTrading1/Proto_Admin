@@ -178,7 +178,7 @@ function ImageLightbox({ label, url, onClose }) {
 
 function ImageQueueRow({ job, selected, onSelect }) {
   return (
-    <button type="button" className={`ipc-queue-row${selected ? ' ipc-queue-row--on' : ''}`} onClick={() => onSelect(job.id)}>
+    <button type="button" aria-pressed={selected} className={`ipc-queue-row${selected ? ' ipc-queue-row--on' : ''}`} onClick={() => onSelect(job.id)}>
       <span className={`ipc-status-dot ipc-status-dot--${job.status}`} />
       <span className="ipc-queue-copy"><strong title={job.filename}>{job.filename}</strong><small>{job.sku || (job.source === 'nutstore' ? 'Nutstore' : 'Local upload')}</small></span>
       <span className={`ipc-status ipc-status--${job.status}`}>{statusLabel(job.status)}</span>
@@ -350,19 +350,23 @@ export default function ImageProcessingCentre({
   const [repairModeJobId, setRepairModeJobId] = useState('');
   const [repairDraft, setRepairDraft] = useState(null);
   const [repairConfirmation, setRepairConfirmation] = useState(false);
+  const [archiveNow, setArchiveNow] = useState(() => new Date());
 
   const summary = useMemo(() => summarizeImageProcessingJobs(jobs), [jobs]);
-  const selectedJob = jobs.find((job) => job.id === selectedJobId) || jobs[0] || null;
-  const selectedJobExecutionAuthorized = selectedJob
-    ? executionAuthorizationRef.current.has(selectedJob.id)
-    : false;
   const hasActiveJobs = jobs.some((job) => ACTIVE_STATUSES.has(job.status));
   const archivedJobs = jobs.filter((job) => ['archived', 'published', 'restored'].includes(job.status));
   const queuedJobs = jobs.filter((job) => !['archived', 'published', 'restored'].includes(job.status));
   const { newlyArchivedJobs, olderArchiveJobs } = useMemo(
-    () => splitImageArchiveJobs(archivedJobs),
-    [archivedJobs],
+    () => splitImageArchiveJobs(archivedJobs, archiveNow),
+    [archiveNow, archivedJobs],
   );
+  const visibleJobs = queueView === 'archive'
+    ? [...newlyArchivedJobs, ...olderArchiveJobs]
+    : queuedJobs;
+  const selectedJob = visibleJobs.find((job) => job.id === selectedJobId) || visibleJobs[0] || null;
+  const selectedJobExecutionAuthorized = selectedJob
+    ? executionAuthorizationRef.current.has(selectedJob.id)
+    : false;
   const workflowStep = selectedJob
     ? (['review', 'ready', 'completed'].includes(selectedJob.status)
       ? 3
@@ -399,6 +403,13 @@ export default function ImageProcessingCentre({
     && repairAreaRatio > 0
     && repairAreaRatio <= 0.35
   );
+
+  useEffect(() => {
+    if (queueView !== 'archive') return undefined;
+    setArchiveNow(new Date());
+    const timer = window.setInterval(() => setArchiveNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, [queueView]);
   const processingOptions = useMemo(() => ({
     treatment: processingPreset,
     manualSafeCutout,
