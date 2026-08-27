@@ -119,6 +119,7 @@ import PlacementsEditor from '../components/PlacementsEditor';
 import AdminSelect from '../components/AdminSelect';
 import ComingSoonPanel from '../components/ComingSoonPanel';
 import OrderEmailNotify from '../components/OrderEmailNotify';
+import NotificationQueueHealth from '../components/NotificationQueueHealth';
 import ProductManagerEngine from '../components/ProductManagerEngine';
 import GroupedSidebar, { NAV_GROUPS } from '../components/GroupedSidebar';
 import { useDashboardStats } from '../hooks/useDashboardStats';
@@ -2966,6 +2967,8 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                     </button>
                   </div>
                 </div>
+
+                <NotificationQueueHealth />
 
                 {(
                 <>
