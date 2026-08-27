@@ -23,7 +23,6 @@ import {
   clearImageProcessingJob,
   executeImageProcessingJob,
   fetchImageProcessingJobs,
-  splitImageArchiveJobs,
   summarizeImageProcessingJobs,
   updateImageProcessingJob,
 } from '../../lib/imageProcessingJobs.js';
@@ -350,19 +349,11 @@ export default function ImageProcessingCentre({
   const [repairModeJobId, setRepairModeJobId] = useState('');
   const [repairDraft, setRepairDraft] = useState(null);
   const [repairConfirmation, setRepairConfirmation] = useState(false);
-  const [archiveNow, setArchiveNow] = useState(() => new Date());
-
   const summary = useMemo(() => summarizeImageProcessingJobs(jobs), [jobs]);
   const hasActiveJobs = jobs.some((job) => ACTIVE_STATUSES.has(job.status));
   const archivedJobs = jobs.filter((job) => ['archived', 'published', 'restored'].includes(job.status));
   const queuedJobs = jobs.filter((job) => !['archived', 'published', 'restored'].includes(job.status));
-  const { newlyArchivedJobs, olderArchiveJobs } = useMemo(
-    () => splitImageArchiveJobs(archivedJobs, archiveNow),
-    [archiveNow, archivedJobs],
-  );
-  const visibleJobs = queueView === 'archive'
-    ? [...newlyArchivedJobs, ...olderArchiveJobs]
-    : queuedJobs;
+  const visibleJobs = queueView === 'archive' ? archivedJobs : queuedJobs;
   const selectedJob = visibleJobs.find((job) => job.id === selectedJobId) || visibleJobs[0] || null;
   const selectedJobExecutionAuthorized = selectedJob
     ? executionAuthorizationRef.current.has(selectedJob.id)
@@ -404,12 +395,6 @@ export default function ImageProcessingCentre({
     && repairAreaRatio <= 0.35
   );
 
-  useEffect(() => {
-    if (queueView !== 'archive') return undefined;
-    setArchiveNow(new Date());
-    const timer = window.setInterval(() => setArchiveNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
-  }, [queueView]);
   const processingOptions = useMemo(() => ({
     treatment: processingPreset,
     manualSafeCutout,
@@ -1036,28 +1021,9 @@ export default function ImageProcessingCentre({
               <span>Checking staged uploads, review items and archive records. Nothing is applied to Product Manager during this load.</span>
             </div>
           ) : queueView === 'archive' && archivedJobs.length ? (
-            <div className="ipc-archive-groups">
-              <section aria-labelledby="ipc-new-archive-heading">
-                <header className="ipc-archive-group-head ipc-archive-group-head--new">
-                  <div><strong id="ipc-new-archive-heading">Newly archived today</strong><span>Images Catherine has just saved</span></div>
-                  <b>{newlyArchivedJobs.length}</b>
-                </header>
-                {newlyArchivedJobs.length ? newlyArchivedJobs.map((job) => (
-                  <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
-                )) : (
-                  <p className="ipc-archive-group-empty">Images saved today will appear here.</p>
-                )}
-              </section>
-              <section aria-labelledby="ipc-old-archive-heading">
-                <header className="ipc-archive-group-head">
-                  <div><strong id="ipc-old-archive-heading">Older archive</strong><span>Previously archived images</span></div>
-                  <b>{olderArchiveJobs.length}</b>
-                </header>
-                {olderArchiveJobs.map((job) => (
-                  <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
-                ))}
-              </section>
-            </div>
+            archivedJobs.map((job) => (
+              <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
+            ))
           ) : queueView === 'queue' && queuedJobs.length ? queuedJobs.map((job) => (
             <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
           )) : (

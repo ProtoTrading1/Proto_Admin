@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   excelImageArchiveSource,
+  filterProductArchiveSection,
   isExcelImageArchiveSource,
+  isNewProductLoaderImageArchiveRow,
   prioritizeLatestExcelImageBatch,
   prioritizeRowsBySku,
 } from '../lib/archive-priority.mjs';
@@ -17,7 +19,7 @@ describe('Archive ordering', () => {
     expect(api).toContain("status === 'archived' ? 'archived' : 'title'");
     expect(api).toContain(".order('archived_at', { ascending: false, nullsFirst: false })");
     expect(api).toContain(".order('updated_at', { ascending: false, nullsFirst: false })");
-    expect(screen).toContain('most recently archived items appear next');
+    expect(screen).toContain('Previously archived products.');
   });
 
   it('refreshes Archive immediately after an Excel/image intake', () => {
@@ -86,5 +88,40 @@ describe('Archive ordering', () => {
     const prioritizeAt = api.indexOf('? prioritizeLatestExcelImageBatch(rows)');
     expect(prioritizeAt).toBeGreaterThan(-1);
     expect(api.indexOf('paginateRows(rows, page, pageSize)', prioritizeAt)).toBeGreaterThan(prioritizeAt);
+  });
+
+  it('separates today\'s Product Loader image intakes from the older product archive in Johannesburg time', () => {
+    const now = new Date('2026-08-27T10:00:00.000Z');
+    const rows = [
+      { sku: 'NUT-NEW', archived_by: 'nutstore', archived_at: '2026-08-26T22:30:00.000Z' },
+      { sku: 'EXCEL-NEW', archived_by: 'excel-images:batch-1', archived_at: '2026-08-27T08:00:00.000Z' },
+      { sku: 'MANUAL-TODAY', archived_by: 'product-manager', archived_at: '2026-08-27T08:00:00.000Z' },
+      { sku: 'NUT-OLD', archived_by: 'nutstore', archived_at: '2026-08-26T20:00:00.000Z' },
+      { sku: 'LEGACY', archived_by: 'nutstore', archived_at: null },
+    ];
+
+    expect(isNewProductLoaderImageArchiveRow(rows[0], now)).toBe(true);
+    expect(filterProductArchiveSection(rows, 'new-images', now).map((row) => row.sku))
+      .toEqual(['NUT-NEW', 'EXCEL-NEW']);
+    expect(filterProductArchiveSection(rows, 'older', now).map((row) => row.sku))
+      .toEqual(['MANUAL-TODAY', 'NUT-OLD', 'LEGACY']);
+    expect(rows).toHaveLength(5);
+  });
+
+  it('puts the new image split in the main Archive and leaves Image Processing history flat', () => {
+    const screen = readFileSync(resolve(ROOT, 'src/components/ProductManagerEngine.jsx'), 'utf8');
+    const centre = readFileSync(resolve(ROOT, 'src/components/productLoader/ImageProcessingCentre.jsx'), 'utf8');
+    const hook = readFileSync(resolve(ROOT, 'src/hooks/useCatalog.js'), 'utf8');
+    const api = readFileSync(resolve(ROOT, 'api/catalog.js'), 'utf8');
+
+    expect(screen).toContain('New image items');
+    expect(screen).toContain('Older archive');
+    expect(screen).toContain("setArchiveSection('new-images')");
+    expect(screen).toContain("archiveSection: status === 'archived' && archiveStockView === 'archived' ? archiveSection : undefined");
+    expect(screen).toContain('No new image items have been sent to Archive today.');
+    expect(hook).toContain("qs.set('archiveSection', params.archiveSection)");
+    expect(api).toContain('filterProductArchiveSection(rows, archiveSection)');
+    expect(centre).not.toContain('Newly archived today');
+    expect(centre).not.toContain('ipc-archive-groups');
   });
 });

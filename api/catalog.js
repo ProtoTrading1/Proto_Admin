@@ -19,6 +19,7 @@ import { loadGroupContextIfEnabled } from './_groups.js';
 import { normalizeMemberSku } from '../lib/product-groups.mjs';
 import {
   isExcelImageArchiveSource,
+  filterProductArchiveSection,
   latestExcelImageBatchSource,
   normalizeArchivePrioritySkus,
   prioritizeLatestExcelImageBatch,
@@ -432,6 +433,7 @@ export default async function handler(req, res) {
     } else if (status === 'archived') {
       const stockFilter = String(req.query.stockFilter || 'archived').trim();
       const archivedSource = String(req.query.archivedSource || 'all').trim();
+      const archiveSection = String(req.query.archiveSection || 'older').trim();
       if (stockFilter === 'negative') {
         // Live products with negative ERP stock only — zeros excluded.
         let rows = await fetchAllLiveRows(sb, { search, categoryPath, tree, sort });
@@ -465,6 +467,7 @@ export default async function handler(req, res) {
           rows = filterByCategoryPath(rows, categoryPath, tree);
         }
         rows = applySearchFilter(rows, search);
+        rows = filterProductArchiveSection(rows, archiveSection);
         // The server-recorded batch is authoritative across independent tabs.
         // Keep the browser hint only as a fallback for older unmarked imports.
         const pinnedBatchSource = latestExcelImageBatchSource(rows);

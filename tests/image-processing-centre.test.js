@@ -101,14 +101,13 @@ describe('Image Processing Centre API adapter', () => {
     expect(olderArchiveJobs.map((job) => job.id)).toEqual(['legacy-without-archive-time', 'old-before-midnight-local']);
   });
 
-  it('labels the new and old archive sections clearly for Catherine', () => {
-    expect(centreSource).toContain('Newly archived today');
-    expect(centreSource).toContain('Images Catherine has just saved');
-    expect(centreSource).toContain('Older archive');
-    expect(stylesheetSource).toContain('.ipc-archive-group-head--new');
+  it('keeps Image Processing history as one operational list with visible selection', () => {
+    expect(centreSource).not.toContain('Newly archived today');
+    expect(centreSource).not.toContain('Images Catherine has just saved');
+    expect(centreSource).not.toContain('ipc-archive-groups');
     expect(centreSource).toContain('aria-pressed={selected}');
     expect(centreSource).toContain("const visibleJobs = queueView === 'archive'");
-    expect(centreSource).toContain('window.setInterval(() => setArchiveNow(new Date()), 60_000)');
+    expect(centreSource).toContain('? archivedJobs : queuedJobs');
   });
 
   it('creates Nutstore batches through the flat collection endpoint', async () => {
