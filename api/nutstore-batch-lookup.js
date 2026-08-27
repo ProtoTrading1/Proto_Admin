@@ -100,15 +100,56 @@ export default async function handler(req, res) {
   await mapPool(uniqueStems, LOOKUP_CONCURRENCY, async (lookupKey) => {
     const group = codeGroups.get(lookupKey) || [];
     const displayCode = group[0]?.displayCode || lookupKey;
+    const parsed = parsedRows[group[0]?.idx]?.parsed;
+    const colourVariant = parsed?.colourVariant;
     const match = await resolveProductLoaderMatch(sb, {
-      code: displayCode,
-      fullCode: parsedRows[group[0]?.idx]?.parsed?.fullCode || null,
-      displayCode,
-      imageSlot: parsedRows[group[0]?.idx]?.parsed?.imageSlot || 1,
+      code: colourVariant?.positillCode || displayCode,
+      fullCode: colourVariant?.positillCode || parsed?.fullCode || null,
+      displayCode: colourVariant?.positillCode || displayCode,
+      imageSlot: colourVariant?.preferredSlot || parsed?.imageSlot || 1,
       dormantSkus,
       strictExact: forImageProcessing,
     });
-    matchByStem.set(lookupKey, match);
+    if (colourVariant) {
+      const variantWebsiteRow = await lookupWebsiteStockExact(sb, colourVariant.variantSku);
+      const inheritedWebsiteRow = variantWebsiteRow || match.websiteRow;
+      const imageSlot = colourVariant.preferredSlot || parsed.imageSlot || 1;
+      const warnings = (match.warnings || []).filter((warning) => ![
+        'image_exists', 'not_in_catalog', 'price_zero', 'low_stock', 'needs_category',
+      ].includes(warning));
+      const field = `image_url_${['one', 'two', 'three', 'four'][imageSlot - 1]}`;
+      if (variantWebsiteRow?.[field]) warnings.push('image_exists');
+      const hasSource = Boolean(match.sqlRow || inheritedWebsiteRow);
+      if (!hasSource) warnings.push('not_in_catalog');
+      const price = Number(match.price ?? inheritedWebsiteRow?.price ?? 0);
+      if (!price) warnings.push('price_zero');
+      if ((match.sqlRow?.available ?? inheritedWebsiteRow?.available_stock ?? inheritedWebsiteRow?.stock_qty) != null
+        && Number(match.sqlRow?.available ?? inheritedWebsiteRow?.available_stock ?? inheritedWebsiteRow?.stock_qty) <= 0) warnings.push('low_stock');
+      if (!inheritedWebsiteRow?.category && !match.sqlRow) warnings.push('needs_category');
+      matchByStem.set(lookupKey, {
+        ...match,
+        code: colourVariant.variantSku,
+        displayCode: colourVariant.variantSku,
+        positillCode: colourVariant.positillCode,
+        variantCode: colourVariant.variantCode,
+        variantLabel: colourVariant.variantLabel,
+        variantOf: colourVariant.positillCode,
+        isVariant: true,
+        isColourVariant: true,
+        barcode: colourVariant.positillCode,
+        price,
+        imageSlot,
+        websiteRow: inheritedWebsiteRow,
+        variantWebsiteRow,
+        baseWebsiteRow: match.websiteRow,
+        websiteStatus: variantWebsiteRow ? 'live' : (match.sqlRow ? 'new' : match.websiteStatus),
+        warnings,
+        canPublish: hasSource,
+        needsReview: warnings.some((warning) => ['price_zero', 'price_source_cached', 'image_exists', 'low_stock', 'needs_category'].includes(warning)),
+      });
+    } else {
+      matchByStem.set(lookupKey, match);
+    }
   });
 
   const items = parsedRows.map((row) => {

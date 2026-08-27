@@ -374,6 +374,7 @@ export default function ProductLoaderNutstore({
         path: item.path,
         filename: item.filename,
         code: item.code,
+        imageSlot: item.imageSlot || 1,
         displayCode: item.displayCode,
         title: catalogueDisplayTitle(item),
         price: item.price ?? item.sqlRow?.price ?? 0,
