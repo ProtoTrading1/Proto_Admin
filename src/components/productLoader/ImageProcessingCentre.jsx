@@ -23,6 +23,7 @@ import {
   clearImageProcessingJob,
   executeImageProcessingJob,
   fetchImageProcessingJobs,
+  splitImageArchiveJobs,
   summarizeImageProcessingJobs,
   updateImageProcessingJob,
 } from '../../lib/imageProcessingJobs.js';
@@ -172,6 +173,16 @@ function ImageLightbox({ label, url, onClose }) {
         <img src={url} alt={`${label} full-size product`} />
       </div>
     </div>
+  );
+}
+
+function ImageQueueRow({ job, selected, onSelect }) {
+  return (
+    <button type="button" className={`ipc-queue-row${selected ? ' ipc-queue-row--on' : ''}`} onClick={() => onSelect(job.id)}>
+      <span className={`ipc-status-dot ipc-status-dot--${job.status}`} />
+      <span className="ipc-queue-copy"><strong title={job.filename}>{job.filename}</strong><small>{job.sku || (job.source === 'nutstore' ? 'Nutstore' : 'Local upload')}</small></span>
+      <span className={`ipc-status ipc-status--${job.status}`}>{statusLabel(job.status)}</span>
+    </button>
   );
 }
 
@@ -348,7 +359,10 @@ export default function ImageProcessingCentre({
   const hasActiveJobs = jobs.some((job) => ACTIVE_STATUSES.has(job.status));
   const archivedJobs = jobs.filter((job) => ['archived', 'published', 'restored'].includes(job.status));
   const queuedJobs = jobs.filter((job) => !['archived', 'published', 'restored'].includes(job.status));
-  const visibleJobs = queueView === 'archive' ? archivedJobs : queuedJobs;
+  const { newlyArchivedJobs, olderArchiveJobs } = useMemo(
+    () => splitImageArchiveJobs(archivedJobs),
+    [archivedJobs],
+  );
   const workflowStep = selectedJob
     ? (['review', 'ready', 'completed'].includes(selectedJob.status)
       ? 3
@@ -1010,12 +1024,31 @@ export default function ImageProcessingCentre({
               <strong>Loading private image queue</strong>
               <span>Checking staged uploads, review items and archive records. Nothing is applied to Product Manager during this load.</span>
             </div>
-          ) : visibleJobs.length ? visibleJobs.map((job) => (
-            <button key={job.id} type="button" className={`ipc-queue-row${selectedJob?.id === job.id ? ' ipc-queue-row--on' : ''}`} onClick={() => setSelectedJobId(job.id)}>
-              <span className={`ipc-status-dot ipc-status-dot--${job.status}`} />
-              <span className="ipc-queue-copy"><strong title={job.filename}>{job.filename}</strong><small>{job.sku || (job.source === 'nutstore' ? 'Nutstore' : 'Local upload')}</small></span>
-              <span className={`ipc-status ipc-status--${job.status}`}>{statusLabel(job.status)}</span>
-            </button>
+          ) : queueView === 'archive' && archivedJobs.length ? (
+            <div className="ipc-archive-groups">
+              <section aria-labelledby="ipc-new-archive-heading">
+                <header className="ipc-archive-group-head ipc-archive-group-head--new">
+                  <div><strong id="ipc-new-archive-heading">Newly archived today</strong><span>Images Catherine has just saved</span></div>
+                  <b>{newlyArchivedJobs.length}</b>
+                </header>
+                {newlyArchivedJobs.length ? newlyArchivedJobs.map((job) => (
+                  <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
+                )) : (
+                  <p className="ipc-archive-group-empty">Images saved today will appear here.</p>
+                )}
+              </section>
+              <section aria-labelledby="ipc-old-archive-heading">
+                <header className="ipc-archive-group-head">
+                  <div><strong id="ipc-old-archive-heading">Older archive</strong><span>Previously archived images</span></div>
+                  <b>{olderArchiveJobs.length}</b>
+                </header>
+                {olderArchiveJobs.map((job) => (
+                  <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
+                ))}
+              </section>
+            </div>
+          ) : queueView === 'queue' && queuedJobs.length ? queuedJobs.map((job) => (
+            <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
           )) : (
             <div className="ipc-empty">{queueView === 'archive' ? <Archive size={22} /> : <Sparkles size={22} />}<strong>{queueView === 'archive' ? 'No archived images yet' : 'No images queued'}</strong><span>{queueView === 'archive' ? 'Reviewed results saved here stay private and separate from processing assets.' : 'Add selected Nutstore images or upload a folder to begin.'}</span><small>{queueView === 'archive' ? 'Archive is private until you explicitly apply an approved image.' : 'Choose a treatment above, then add your first image to start.'}</small></div>
           )}

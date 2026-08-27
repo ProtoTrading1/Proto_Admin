@@ -7373,6 +7373,15 @@ html, body { background: #f5f5f5; color: #111827; }
 .ipc-empty strong, .ipc-review-empty strong { color: #475569; font-size: 13px; }
 .ipc-empty small { max-width: 230px; color: #64748b; font-size: 10px; line-height: 1.4; }
 .ipc-queue [role="tabpanel"] { min-height: 180px; }
+.ipc-archive-groups > section + section { border-top: 2px solid #cbd5e1; }
+.ipc-archive-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; background: #eef2f7; color: #475569; }
+.ipc-archive-group-head--new { background: #ecfdf5; color: #166534; }
+.ipc-archive-group-head div { min-width: 0; }
+.ipc-archive-group-head strong, .ipc-archive-group-head span { display: block; }
+.ipc-archive-group-head strong { font-size: 12px; }
+.ipc-archive-group-head span { margin-top: 2px; font-size: 9px; font-weight: 600; }
+.ipc-archive-group-head b { display: grid; flex: 0 0 auto; min-width: 24px; height: 24px; place-items: center; border-radius: 99px; background: #fff; font-size: 10px; }
+.ipc-archive-group-empty { margin: 0; padding: 13px 11px; border-top: 1px solid #d1fae5; background: #f7fef9; color: #64748b; font-size: 10px; }
 .ipc-centre button:focus-visible, .ipc-centre input:focus-visible, .ipc-centre textarea:focus-visible, .ipc-centre select:focus-visible { outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px; }
 .ipc-review { min-width: 0; padding: 18px; }
 .ipc-review-empty { min-height: 430px; }

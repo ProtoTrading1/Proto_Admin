@@ -8,6 +8,7 @@ import {
   fetchImageProcessingJobs,
   multiSkuMappingsFromFilename,
   normalizeImageProcessingJob,
+  splitImageArchiveJobs,
   summarizeImageProcessingJobs,
   updateImageProcessingJob,
 } from '../src/lib/imageProcessingJobs.js';
@@ -69,6 +70,34 @@ describe('Image Processing Centre API adapter', () => {
       status: 'review',
       displayed_asset_id: 'ipc_asset_123',
     })).toMatchObject({ displayedAssetId: 'ipc_asset_123' });
+  });
+
+  it('separates images archived today from the older archive in Johannesburg time', () => {
+    const { newlyArchivedJobs, olderArchiveJobs } = splitImageArchiveJobs([
+      {
+        id: 'new-direct',
+        archivedAt: '2026-08-27T08:00:00.000Z',
+      },
+      {
+        id: 'new-after-midnight-local',
+        archive: { destinationSnapshot: { capturedAt: '2026-08-26T22:30:00.000Z' } },
+      },
+      {
+        id: 'old-before-midnight-local',
+        archive: { destinationSnapshot: { capturedAt: '2026-08-26T20:00:00.000Z' } },
+      },
+      { id: 'legacy-without-archive-time', createdAt: '2026-08-27T09:00:00.000Z' },
+    ], new Date('2026-08-27T10:00:00.000Z'));
+
+    expect(newlyArchivedJobs.map((job) => job.id)).toEqual(['new-direct', 'new-after-midnight-local']);
+    expect(olderArchiveJobs.map((job) => job.id)).toEqual(['legacy-without-archive-time', 'old-before-midnight-local']);
+  });
+
+  it('labels the new and old archive sections clearly for Catherine', () => {
+    expect(centreSource).toContain('Newly archived today');
+    expect(centreSource).toContain('Images Catherine has just saved');
+    expect(centreSource).toContain('Older archive');
+    expect(stylesheetSource).toContain('.ipc-archive-group-head--new');
   });
 
   it('creates Nutstore batches through the flat collection endpoint', async () => {
