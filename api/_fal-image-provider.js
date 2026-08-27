@@ -41,6 +41,11 @@ const TREATMENT_ALIASES = Object.freeze({
   targeted_reconstruction: IMAGE_TREATMENTS.TARGETED_RECONSTRUCTION,
 });
 
+// Printed stickers, labels and barcodes are product content, not disposable
+// background. Treat explicit preservation instructions as a protected detail
+// lane even when an older caller still sends the generic opaque treatment.
+const PRESERVATION_CONTENT_HINT = /\b(stickers?|labels?|barcodes?|printed\s+(?:words?|numbers?|text)|hangtags?|hang\s+tags?)\b/i;
+
 function boundedInstructions(value) {
   return String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 1_000);
 }
@@ -52,8 +57,10 @@ function boundedInstructions(value) {
  */
 export function normalizeImageTreatment(value, instructions = '') {
   const explicit = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
-  if (TREATMENT_ALIASES[explicit]) return TREATMENT_ALIASES[explicit];
+  const aliased = TREATMENT_ALIASES[explicit];
+  if (aliased && aliased !== IMAGE_TREATMENTS.STANDARD_OPAQUE) return aliased;
   const hint = `${explicit} ${boundedInstructions(instructions)}`.toLowerCase();
+  if (PRESERVATION_CONTENT_HINT.test(hint)) return IMAGE_TREATMENTS.BEADS_FINE_DETAIL;
   if (/\b(transparent|clear\s+pack|clear\s+plastic|cellophane|acrylic)\b/.test(hint)) return IMAGE_TREATMENTS.TRANSPARENT_CLEAR;
   if (/\b(beads?|chain|fine[ -]?detail|jewellery findings?|sequins?)\b/.test(hint)) return IMAGE_TREATMENTS.BEADS_FINE_DETAIL;
   if (/\b(multi[ -]?piece|set of|pack of|assortment|bundle|pieces)\b/.test(hint)) return IMAGE_TREATMENTS.MULTI_PIECE;
@@ -356,12 +363,20 @@ export async function detectRemovedLightContent(sourceBuffer, cutoutBuffer, { sa
     const blue = source.bitmap.data[offset + 2];
     const luminance = (red * 0.2126) + (green * 0.7152) + (blue * 0.0722);
     const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
-    if (luminance >= 208 && chroma <= 48) candidate[index] = 1;
+    // Preserve the original pale-label check, but also catch a dark or
+    // coloured sticker/printed label that was erased into the new background.
+    // Edge-connected regions are discarded below, so ordinary dark scenery
+    // around a product does not become a warning while enclosed content does.
+    const looksLikeLightProductContent = luminance >= 208 && chroma <= 48;
+    const looksLikeDarkOrColouredContent = luminance <= 175 || chroma >= 48;
+    if (looksLikeDarkOrColouredContent) candidate[index] = 2;
+    else if (looksLikeLightProductContent) candidate[index] = 1;
   }
 
   const regions = [];
   for (let start = 0; start < total; start += 1) {
     if (!candidate[start] || visited[start]) continue;
+    const regionKind = candidate[start];
     let head = 0;
     let tail = 0;
     let area = 0;
@@ -389,7 +404,7 @@ export async function detectRemovedLightContent(sourceBuffer, cutoutBuffer, { sa
         y + 1 < height ? current + width : -1,
       ];
       for (const next of neighbours) {
-        if (next < 0 || visited[next] || !candidate[next]) continue;
+        if (next < 0 || visited[next] || candidate[next] !== regionKind) continue;
         visited[next] = 1;
         queue[tail++] = next;
       }
@@ -526,3 +541,4 @@ export async function standardizeFalOutput(buffer, { size = 1600, paddingRatio =
     treatment: plan,
   };
 }
+

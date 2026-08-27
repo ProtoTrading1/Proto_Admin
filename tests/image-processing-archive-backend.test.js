@@ -47,6 +47,17 @@ describe('Image Processing Centre archive-first backend', () => {
     expect(websiteReady.getPixelColor(0, 0) >>> 8).toBe(0xffffff);
   });
 
+  it('contains and centers a non-square worker output on the white 1600px canvas', async () => {
+    const workerOutput = new Jimp({ width: 800, height: 400, color: 0x00000000 });
+    workerOutput.setPixelColor(0x223344ff, 400, 200);
+    const result = await createWebsiteReadyDerivative(await workerOutput.getBuffer('image/png'));
+    const websiteReady = await Jimp.read(result.buffer);
+
+    expect(websiteReady.bitmap).toMatchObject({ width: 1600, height: 1600 });
+    expect(websiteReady.getPixelColor(0, 0) >>> 8).toBe(0xffffff);
+    expect(websiteReady.getPixelColor(800, 800) >>> 8).not.toBe(0xffffff);
+  });
+
   it('archives only an approved image that has both private and website-ready versions', async () => {
     const { client, copies } = archiveStorage();
     const archived = await archiveApprovedImage({ id: 'ipc_1' }, {
@@ -125,3 +136,4 @@ describe('Image Processing Centre archive-first backend', () => {
       .rejects.toThrow(/#FFFFFF/);
   });
 });
+

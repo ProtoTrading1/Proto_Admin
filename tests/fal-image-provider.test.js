@@ -119,6 +119,37 @@ describe('fal.ai image provider', () => {
     expect(opaqueDamaged.suspicious).toBe(true);
   });
 
+  it('blocks a cut-out that removes an enclosed dark or coloured sticker', async () => {
+    const source = new Jimp({ width: 160, height: 120, color: 0xffffffff });
+    const cutout = new Jimp({ width: 160, height: 120, color: 0xffffffff });
+    // Keep a normal foreground object so the dark sticker is an interior
+    // product region rather than an edge-connected background.
+    for (let y = 35; y < 85; y += 1) for (let x = 20; x < 65; x += 1) {
+      source.setPixelColor(0x2050a0ff, x, y);
+      cutout.setPixelColor(0x2050a0ff, x, y);
+    }
+    for (let y = 30; y < 75; y += 1) for (let x = 90; x < 125; x += 1) {
+      source.setPixelColor(0x18202cff, x, y);
+    }
+    const damaged = await detectRemovedLightContent(
+      await source.getBuffer('image/png'),
+      await cutout.getBuffer('image/png'),
+      { sampleSize: 160 },
+    );
+    expect(damaged.suspicious).toBe(true);
+    expect(damaged.regions[0]).toMatchObject({ width: 35, height: 45 });
+
+    for (let y = 30; y < 75; y += 1) for (let x = 90; x < 125; x += 1) {
+      cutout.setPixelColor(0x18202cff, x, y);
+    }
+    const intact = await detectRemovedLightContent(
+      await source.getBuffer('image/png'),
+      await cutout.getBuffer('image/png'),
+      { sampleSize: 160 },
+    );
+    expect(intact.suspicious).toBe(false);
+  });
+
   it('routes clear packaging, beads, and multi-piece products away from destructive generic removal', () => {
     for (const treatment of ['transparent_clear', 'beads_fine_detail', 'multi_piece']) {
       expect(resolveImageTreatment({ treatment })).toMatchObject({
@@ -139,6 +170,21 @@ describe('fal.ai image provider', () => {
     expect(resolveImageTreatment({ treatment: 'measurements' })).toMatchObject({ mode: 'preserve_source', removeBackground: false });
     expect(resolveImageTreatment({ treatment: 'shadow' })).toMatchObject({ mode: 'background_remove', addShadow: true });
     expect(resolveImageTreatment({ instructions: 'Keep every one of the 12 beads visible' })).toMatchObject({ id: 'beads_fine_detail' });
+  });
+
+  it('promotes sticker and printed-label instructions out of generic clean-up', () => {
+    for (const instructions of [
+      'Preserve the sticker on the metal bead.',
+      'Keep every printed label and barcode.',
+      'Do not remove the hanging tag or printed number.',
+    ]) {
+      expect(resolveImageTreatment({ treatment: 'standard_opaque', instructions })).toMatchObject({
+        id: 'beads_fine_detail',
+        mode: 'preserve_source',
+        allowAutomaticProcessing: false,
+        preserve: { labels: true, text: true, productParts: true },
+      });
+    }
   });
 
   it('maps a red-box selection against the exact displayed asset geometry', () => {
@@ -195,3 +241,4 @@ describe('fal.ai image provider', () => {
     )).rejects.toThrow(/displayed image changed/);
   });
 });
+

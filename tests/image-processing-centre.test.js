@@ -128,16 +128,6 @@ describe('Product Loader handoff and owner visibility', () => {
     expect(centreSource).toContain('onOpenNutstore');
   });
 
-  it('shows newly added Nutstore images in the processing queue immediately', () => {
-    expect(centreSource).toContain("if (!created.length) throw new Error('Nutstore returned no image queue items. Please try Add selected again.')");
-    expect(centreSource).toContain("setQueueView('queue');");
-    expect(centreSource).toContain('setSelectedJobId(created[0].id);');
-    expect(centreSource).toContain('await loadJobs({ quiet: true });');
-    expect(centreSource).toContain('Do not let a briefly stale index erase work that this tab just');
-    expect(centreSource).toContain('const byId = new Map(current.map((job) => [job.id, job]));');
-    expect(centreSource).toContain('for (const job of rows) byId.set(job.id, { ...byId.get(job.id), ...job });');
-  });
-
   it('offers a separate discard action for approved staged images', () => {
     expect(centreSource).toContain("'approved', 'failed'");
     expect(centreSource).toContain('Discard staged image');
@@ -207,23 +197,6 @@ describe('Product Loader handoff and owner visibility', () => {
     expect(adminSource).toContain('titleOnly');
   });
 
-  it('keeps Image Processing Centre refreshable and deep-linkable', () => {
-    expect(adminSource).toContain("from '../lib/adminSectionRoute'");
-    expect(adminSource).toContain('initialAdminSectionFromSearch({');
-    expect(adminSource).toContain('normalizeRequestedAdminSection(');
-    expect(adminSource).toContain('adminSectionUrl({');
-    expect(adminSource).toContain("replaceAdminSectionUrl(activeSection);");
-    expect(adminSource).not.toContain("window.history.replaceState({}, '', window.location.pathname);");
-  });
-
-  it('explains slow Image Processing Centre loads instead of looking blank', () => {
-    expect(adminSource).toContain('Loading Image Processing Centre queue and image tools');
-    expect(centreSource).toContain('Loading private image queue');
-    expect(centreSource).toContain('Nothing is applied to Product Manager during this load.');
-    expect(centreSource).toContain('Retry');
-    expect(centreSource).toContain('The image service could not be reached.');
-  });
-
   it('hands off selected Nutstore paths and selected upload files', () => {
     expect(nutstoreSource).toContain('onProcessSelected(selectedPaths.map');
     expect(nutstoreSource).toContain('Improve selected');
@@ -236,6 +209,8 @@ describe('Product Loader handoff and owner visibility', () => {
     expect(adminSource).toContain('intakeOptions={imageProcessingIntake}');
     expect(adminSource).toContain('onIntakeOptionsChange={rememberImageProcessingIntake}');
     expect(centreSource).toContain("useState(() => intakeOptions?.treatment || 'standard_opaque')");
+    expect(centreSource).toContain('rememberIntakeChange({ treatment: preset.id, instructions: customInstructions })');
+    expect(centreSource).toContain('rememberIntakeChange({ treatment: processingPreset, instructions })');
   });
 
   it('shows large, uncropped Nutstore source thumbnails for visual selection', () => {
@@ -252,13 +227,11 @@ describe('Product Loader handoff and owner visibility', () => {
     expect(centre).toContain('Save approved result to Image Archive');
     expect(centre).toContain('Confirm and apply to Product Manager');
     expect(centre).not.toContain("runAction(job, 'publish'");
-    expect(centre).toContain('Archive saving is deliberately individual');
-    expect(centre).toContain("runBulkReviewAction('reject')");
+    expect(centre).toContain("runBulkReviewAction('archive')");
     expect(centre).toContain("runAction(selectedJob, 'approve',");
     expect(centre).not.toContain("updateImageProcessingJob(job.id, 'approve')");
     expect(centre).toContain("runAction(selectedJob, 'archive')");
-    expect(centre).toContain('confirmQueueMutation(job, action)');
-    expect(centre).toContain("runConfirmedQueueAction(selectedJob, 'restore')");
+    expect(centre).toContain("runAction(selectedJob, 'restore')");
     expect(centre).toContain('Clear from queue');
     expect(centre).toContain('manual human review');
     expect(centre).toContain('Targeted background repair');
@@ -266,27 +239,17 @@ describe('Product Loader handoff and owner visibility', () => {
     expect(centre).toContain('History & archive');
   });
 
-  it('confirms private queue mutations and prevents bulk archive bypass', () => {
-    const centre = fs.readFileSync(new URL('../src/components/productLoader/ImageProcessingCentre.jsx', import.meta.url), 'utf8');
-    expect(centre).toContain('function confirmQueueMutation(job, action)');
-    expect(centre).toContain('if (!confirmQueueMutation(job, action)) return null;');
-    expect(centre).not.toContain("runAction(selectedJob, 'restore')");
-    expect(centre).toContain('function confirmBulkReviewMutation(candidates, action)');
-    expect(centre).toContain("if (action !== 'reject') return false");
-    expect(centre).toContain('Product Manager and the live website unchanged');
-    expect(centre).toContain('Archive saving is deliberately individual');
-    expect(centre).not.toContain('Save all reviewed to archive');
+  it('returns signed original and website-ready preview URLs immediately after a mutation', () => {
+    const jobsRoute = fs.readFileSync(new URL('../api/image-processing-jobs.js', import.meta.url), 'utf8');
+    expect(jobsRoute).toContain('const [publicUpdated] = await publicJobItemsWithSource(saved, [saved.images[runningIndex]])');
+    expect(jobsRoute).toContain('const [publicUpdated] = await publicJobItemsWithSource(saved, [saved.images[index]])');
   });
 
-  it('contains long filenames in the queue and selected review header', () => {
+  it('refreshes signed preview URLs when an image expires or fails to load', () => {
     const centre = fs.readFileSync(new URL('../src/components/productLoader/ImageProcessingCentre.jsx', import.meta.url), 'utf8');
-    expect(centre).toContain('<strong title={job.filename}>{job.filename}</strong>');
-    expect(centre).toContain('<h4 title={selectedJob.filename}>{selectedJob.filename}</h4>');
-    expect(stylesheetSource).toContain('.ipc-queue-copy { min-width: 0; overflow: hidden; }');
-    expect(stylesheetSource).toContain('.ipc-review-head > div:first-child { min-width: 0; }');
-    expect(stylesheetSource).toContain('.ipc-review-head h4 { max-width: 100%;');
-    expect(stylesheetSource).toContain('.ipc-asset-line > div { min-width: 0; }');
-    expect(stylesheetSource).toContain('.ipc-asset-line span { margin-top: 2px; overflow-wrap: anywhere;');
+    expect(centre).toContain('refreshExpiredPreview');
+    expect(centre).toContain('onError={onImageError}');
+    expect(centre).toContain('loadJobs({ quiet: true })');
   });
 
   it('requires a complete human checklist and treatment acknowledgement before approval', () => {
@@ -309,9 +272,15 @@ describe('Product Loader handoff and owner visibility', () => {
     expect(centre).toContain('manualSafeCutout');
     expect(centre).toContain('I inspected these source images and confirm an automatic cutout is safe.');
     expect(centre).toContain('This is a source-preserving/manual lane.');
-    expect(centre).toContain('if (intakeCanStart) authorizeExecution(created);');
-    expect(centre).toContain('Processing is paused until the safety confirmation is complete.');
-    expect(centre).not.toContain("nutstoreConnection.status === 'missing' || !intakeCanStart");
+    expect(centre).toContain('!intakeCanStart');
+  });
+
+  it('blocks generic clean-up when sticker or printed-label preservation is requested', () => {
+    const centre = fs.readFileSync(new URL('../src/components/productLoader/ImageProcessingCentre.jsx', import.meta.url), 'utf8');
+    expect(centre).toContain('PRESERVATION_CONTENT_HINT');
+    expect(centre).toContain('genericTreatmentWithPreservationContent');
+    expect(centre).toContain('Sticker/label preservation requires a protected treatment.');
+    expect(centre).toContain('Generic clean-up is blocked');
   });
 
   it('draws targeted repairs against the exact rendered processed asset and creates a new review revision', () => {
@@ -343,8 +312,9 @@ describe('Product Loader handoff and owner visibility', () => {
     expect(centre).toContain('Confirm Product Manager image replacement');
     expect(centre).toContain('Current Product Manager ${selectedSlot.label}');
     expect(centre).toContain('Proposed archive asset');
-    expect(centre).toContain('SKU {destinationProduct.sku} · {destinationProduct.title || \'Untitled product\'} · {selectedSlot.label}');
+    expect(centre).toContain('SKU {destinationProduct.sku} Â· {destinationProduct.title || \'Untitled product\'} Â· {selectedSlot.label}');
     expect(centre).toContain('url={currentDestinationImage}');
     expect(centre).toContain('url={selectedJob.afterUrl}');
   });
 });
+

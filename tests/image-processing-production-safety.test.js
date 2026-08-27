@@ -127,6 +127,32 @@ describe('Image Processing Centre production mutation safety', () => {
     })).toThrow(/treatment-specific/i);
   });
 
+  it('blocks approval when preservation detects removed light product content, even with a high raw score', () => {
+    const beadImage = {
+      id: 'bead-img',
+      status: 'review',
+      quality: {
+        ...cleanQuality,
+        // The preservation detector intentionally downgrades this result in
+        // production, but keep the raw score high here to prove the warning
+        // itselfâ€”not score roundingâ€”remains an approval gate.
+        score: 98,
+        grade: 'excellent',
+        flags: ['possible_removed_label_or_light_product_part'],
+        requiresManualReview: true,
+      },
+      warnings: ['possible_removed_label_or_light_product_part'],
+    };
+    expect(() => markImageApproved(beadImage, {
+      actor: 'owner',
+      reviewChecklist: {
+        correctSku: true,
+        labelsPreserved: true,
+        cleanEdgesBackground: true,
+      },
+    })).toThrow(/not clean enough|quality warning|unresolved processing warnings/i);
+  });
+
   it('captures the exact live Product Manager image when an approved result is archived', async () => {
     const { stock } = stockHarness({ liveUrl: 'https://images.example/current.jpg' });
     const approved = {
@@ -338,3 +364,4 @@ describe('Image Processing Centre production mutation safety', () => {
     expect(revision.processed.transparentPrivatePath).toContain(revision.id);
   });
 });
+

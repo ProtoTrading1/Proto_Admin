@@ -207,7 +207,8 @@ async function startFalProcessing(res, actor, job, index) {
 async function runFalProcessing(res, actor, job, index) {
   let image = job.images[index];
   if (image.status === 'review') {
-    return res.status(200).json({ ok: true, idempotent: true, job: publicImageJob(job, image) });
+    const [publicReview] = await publicJobItemsWithSource(job, [image]);
+    return res.status(200).json({ ok: true, idempotent: true, job: publicReview });
   }
 
   // Preview builds before the asynchronous contract saved `processing`
@@ -256,7 +257,8 @@ async function runFalProcessing(res, actor, job, index) {
     }
     if (currentImage.status === 'review') {
       await releaseImageObjectClaim(FAL_START_CLAIM_JOB, scope, recoveryClaim.id).catch(() => {});
-      return res.status(200).json({ ok: true, idempotent: true, job: publicImageJob(current, currentImage) });
+      const [publicReview] = await publicJobItemsWithSource(current, [currentImage]);
+      return res.status(200).json({ ok: true, idempotent: true, job: publicReview });
     }
     if (currentImage.status !== 'processing' || currentImage.processing?.claimId) {
       await releaseImageObjectClaim(FAL_START_CLAIM_JOB, scope, recoveryClaim.id).catch(() => {});
@@ -316,7 +318,8 @@ async function runFalProcessing(res, actor, job, index) {
 
     if (currentImage.status === 'review') {
       terminalPersisted = true;
-      return res.status(200).json({ ok: true, idempotent: true, job: publicImageJob(runningJob, currentImage) });
+      const [publicReview] = await publicJobItemsWithSource(runningJob, [currentImage]);
+      return res.status(200).json({ ok: true, idempotent: true, job: publicReview });
     }
     if (currentImage.status !== 'processing' || currentImage.processing?.claimId !== image.processing.claimId) {
       return res.status(409).json({ error: 'The fal.ai processing claim is stale' });
@@ -374,7 +377,8 @@ async function runFalProcessing(res, actor, job, index) {
 
     const saved = await persistJob(runningJob);
     terminalPersisted = true;
-    return res.status(200).json({ ok: true, job: publicImageJob(saved, saved.images[runningIndex]) });
+    const [publicUpdated] = await publicJobItemsWithSource(saved, [saved.images[runningIndex]]);
+    return res.status(200).json({ ok: true, job: publicUpdated });
   } finally {
     if (terminalPersisted) {
       await releaseImageObjectClaim(FAL_RUN_CLAIM_JOB, scope, runClaim.id).catch(() => {});
@@ -585,7 +589,8 @@ async function reviewAction(req, res, actor, action) {
       });
     }
     const saved = await persistJob(job);
-    return res.status(200).json({ ok: true, job: publicImageJob(saved, saved.images[index]) });
+    const [publicUpdated] = await publicJobItemsWithSource(saved, [saved.images[index]]);
+    return res.status(200).json({ ok: true, job: publicUpdated });
   } catch (error) {
     const status = ['image_exists', 'ipc_destination_conflict', 'ipc_job_destination_conflict', 'ipc_product_conflict', 'ipc_product_image_conflict', 'ipc_restore_conflict', 'ipc_archive_confirmation_required', 'ipc_archive_snapshot_required', 'ipc_repair_stale_asset', 'ipc_repair_geometry_changed'].includes(error.code)
       ? 409
@@ -636,3 +641,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error?.message || 'Image processing request failed' });
   }
 }
+

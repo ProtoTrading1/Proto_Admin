@@ -226,13 +226,18 @@ export async function analyzeImageQuality(buffer) {
 
 // The cut-out is retained privately as the reusable master. The review and
 // archive derivative is deliberately what the customer will see: a consistent
-// 1600 × 1600 white JPEG, rather than a transparent image on an unknown page.
+// 1600 Ã— 1600 white JPEG, rather than a transparent image on an unknown page.
 export async function createWebsiteReadyDerivative(masterBuffer, { size = 1600 } = {}) {
   const master = await Jimp.read(masterBuffer);
-  const canvas = new Jimp({ width: size, height: size, color: 0xffffffff });
-  canvas.composite(master, 0, 0);
+  const targetSize = Math.max(1, Math.round(Number(size) || 1600));
+  const scale = Math.min(1, targetSize / master.bitmap.width, targetSize / master.bitmap.height);
+  const contained = scale < 1
+    ? master.clone().resize({ w: Math.max(1, Math.round(master.bitmap.width * scale)), h: Math.max(1, Math.round(master.bitmap.height * scale)) })
+    : master;
+  const canvas = new Jimp({ width: targetSize, height: targetSize, color: 0xffffffff });
+  canvas.composite(contained, Math.round((targetSize - contained.bitmap.width) / 2), Math.round((targetSize - contained.bitmap.height) / 2));
   const buffer = await canvas.getBuffer('image/jpeg');
-  return { buffer, width: size, height: size, background: '#FFFFFF', format: 'jpeg' };
+  return { buffer, width: targetSize, height: targetSize, background: '#FFFFFF', format: 'jpeg' };
 }
 
 async function storeTransparentMaster(job, image, buffer, runId) {
@@ -688,7 +693,7 @@ function resolvedProductDestination(image, requestedSlot = image.slot) {
   )) {
     throw imageProcessingError(
       'ipc_destination_conflict',
-      'This image’s saved Product Manager destination no longer matches its SKU. It was not sent anywhere.',
+      'This imageâ€™s saved Product Manager destination no longer matches its SKU. It was not sent anywhere.',
     );
   }
   return destination;
@@ -1150,3 +1155,4 @@ export async function rejectImage(image, { actor, reason = '' } = {}) {
     rejectionReason: String(reason || '').trim().slice(0, 500) || null,
   };
 }
+

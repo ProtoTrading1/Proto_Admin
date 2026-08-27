@@ -18,12 +18,15 @@ export async function readApiJson(res, { fallback } = {}) {
     } catch {
       const hint = text.slice(0, 120).replace(/\s+/g, ' ').trim();
       throw new Error(hint && !hint.startsWith('{')
-        ? `${fb}${hint ? ` — ${hint}` : ''}`
+        ? `${fb}${hint ? ` â€” ${hint}` : ''}`
         : (fb || 'Server returned invalid JSON'));
     }
   }
   if (!res.ok) {
-    throw new Error(errorFromJson(json, fb));
+    const error = new Error(errorFromJson(json, fb));
+    error.status = res.status;
+    throw error;
   }
   return json;
 }
+
