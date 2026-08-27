@@ -3016,6 +3016,43 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
 }
 
 /* Featured products */
+.featured-workspace-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+.featured-workspace-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.featured-workspace-section {
+  padding: 18px 0;
+}
+
+.featured-workspace-section + .featured-workspace-section {
+  margin-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.featured-workspace-section-head {
+  margin-bottom: 12px;
+}
+
+.featured-workspace-heading {
+  margin: 0 0 5px;
+  color: #1f2937;
+  font-size: 16px;
+}
+
 .featured-order-guide {
   display: flex;
   align-items: center;
@@ -3263,7 +3300,6 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
   border: 1px solid #e8eaed;
   border-radius: 10px;
   background: #fff;
-  cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -3273,12 +3309,75 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
 }
 
 .featured-pick-card--selected {
-  border-color: #8B1A1A;
-  background: #fef2f2;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.featured-pick-action {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 76px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.featured-pick-action:hover:not(:disabled) {
+  border-color: #9ca3af;
+  background: #f8fafc;
+}
+
+.featured-pick-action--selected {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.featured-pick-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.featured-pick-action:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.3);
+  outline-offset: 2px;
+}
+
+@media (max-width: 700px) {
+  .featured-workspace-toolbar {
+    position: static;
+  }
+
+  .featured-workspace-toolbar .adm-pill {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .featured-workspace-toolbar button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .featured-pick-card {
+    flex-wrap: wrap;
+  }
+
+  .featured-pick-action {
+    width: 100%;
+  }
 }
 
 .featured-pick-card input {
-  margin-top: 4px;
   flex-shrink: 0;
 }
 

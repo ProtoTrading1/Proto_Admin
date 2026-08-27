@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { dispatchFeaturedSave, moveFlatListItem, reorderFlatList } from '../src/components/FeaturedPanel';
+import {
+  dispatchFeaturedSave,
+  hasFeaturedChanges,
+  moveFlatListItem,
+  reorderFlatList,
+} from '../src/components/FeaturedPanel';
 import { saveFeaturedProducts } from '../src/lib/featuredProducts';
 
 const products = [
@@ -49,6 +54,13 @@ describe('featured storefront order grid', () => {
       .toBe('live');
     expect(onLive).toHaveBeenCalledWith(products);
     expect(onPreview).not.toHaveBeenCalled();
+  });
+
+  it('waits for one deliberate save after adding, removing or reordering products', () => {
+    expect(hasFeaturedChanges(products, products)).toBe(false);
+    expect(hasFeaturedChanges(products, [products[1], products[0], products[2], products[3]])).toBe(true);
+    expect(hasFeaturedChanges(products, products.slice(0, 3))).toBe(true);
+    expect(hasFeaturedChanges(products, [...products, { id: 'E', sku: 'E' }])).toBe(true);
   });
 
   it('persists the exact visual sequence consumed by the live portal', async () => {

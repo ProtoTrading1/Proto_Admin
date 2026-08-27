@@ -9,8 +9,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   Grip,
   Loader2,
+  Plus,
+  RotateCcw,
+  Save,
   Search,
   Sparkles,
   X,
@@ -28,9 +32,6 @@ import { formatSortSavedAt } from '../lib/sortOrderStore';
 import { formatWebsitePrice } from '../lib/pricing';
 import { isReadOnlyPreviewHost } from '../lib/previewWriteGuard';
 
-const PICK_SAVE_MS = 2000;
-const ORDER_SAVE_MS = 600;
-
 export function dispatchFeaturedSave({ previewSimulation = false, items = [], onPreview, onLive } = {}) {
   if (previewSimulation) {
     onPreview?.(items);
@@ -38,6 +39,10 @@ export function dispatchFeaturedSave({ previewSimulation = false, items = [], on
   }
   onLive?.(items);
   return 'live';
+}
+
+export function hasFeaturedChanges(savedItems = [], draftItems = []) {
+  return savedItems.map((item) => item.sku).join('\n') !== draftItems.map((item) => item.sku).join('\n');
 }
 
 const LINK_BTN = {
@@ -211,7 +216,7 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
   if (!products.length) {
     return (
       <p className="adm-section-note" style={{ margin: '24px 0' }}>
-        No featured products yet. Switch to Pick products to add items for the home page.
+        No featured products yet. Search below and add the first product for the home page.
       </p>
     );
   }
@@ -292,7 +297,6 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const queryClient = useQueryClient();
   const previewSimulation = typeof window !== 'undefined'
     && isReadOnlyPreviewHost(window.location.hostname);
-  const [view, setView] = useState('arrange');
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -304,6 +308,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const orderSaveTimerRef = useRef(null);
   const pendingItemsRef = useRef(null);
   const pendingBaseItemsRef = useRef(null);
+  const [draftItems, setDraftItems] = useState(null);
 
   // The app-wide defaults are staleTime 60s, no focus refetch and no interval,
   // which suit the heavy catalogue queries. They are wrong for this one: when
@@ -315,10 +320,12 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     queryFn: fetchFeaturedProducts,
     staleTime: 0,
     refetchOnMount: 'always',
-    refetchOnWindowFocus: saveState === 'saved' || saveState === 'error',
+    refetchOnWindowFocus: draftItems === null && (saveState === 'saved' || saveState === 'error'),
   });
 
-  const featuredItems = featuredQuery.data?.items || [];
+  const savedFeaturedItems = featuredQuery.data?.items || [];
+  const featuredItems = draftItems ?? savedFeaturedItems;
+  const hasUnsavedChanges = hasFeaturedChanges(savedFeaturedItems, featuredItems);
   const featuredSkuSet = useMemo(
     () => new Set(featuredItems.map((item) => item.sku)),
     [featuredItems],
@@ -354,7 +361,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     onlyInStock: false,
   }), [page, debouncedSearch, categoryPath]);
 
-  const pickerQuery = useCatalogQuery(catalogParams, { enabled: view === 'pick' });
+  const pickerQuery = useCatalogQuery(catalogParams, { enabled: true });
   const pickerRows = pickerQuery.data?.rows || [];
   const pickerTotal = pickerQuery.data?.total || 0;
 
@@ -389,10 +396,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     };
   }), [featuredItems, catalogBySku]);
 
-  // Every edit gets a number. A save may only apply if it is still the newest
-  // one issued: picks debounce for 2s while a remove fires immediately, so an
-  // older payload could otherwise land last and write the removed product
-  // straight back — which is what made products impossible to remove.
+  // Every save gets a number so an older response can never repaint newer work.
   const editSeqRef = useRef(0);
 
   const saveMutation = useMutation({
@@ -406,14 +410,13 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
       if (data.seq !== editSeqRef.current) return;
       latestUpdatedAtRef.current = data.updatedAt;
       queryClient.setQueryData(queryKeys.featuredProducts(), { items: data.items, updatedAt: data.updatedAt });
+      setDraftItems(null);
       setSaveMeta({ updatedAt: data.updatedAt });
       setSaveState('saved');
     },
     onError: (err) => {
       setSaveState('error');
       onShowToast?.(err.message || 'Failed to save featured list', 'error');
-      // The optimistic list may no longer reflect the server — resync.
-      queryClient.invalidateQueries({ queryKey: queryKeys.featuredProducts() });
     },
   });
 
@@ -432,9 +435,12 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     dispatchFeaturedSave({
       previewSimulation,
       items,
-      onPreview: () => setSaveState('preview'),
+      onPreview: () => {
+        setSaveState('preview');
+        onShowToast?.('Preview only — no website or backend changes were saved.', 'success');
+      },
       onLive: () => {
-        setSaveState('pending');
+        setSaveState('saving');
         const seq = (editSeqRef.current += 1);
         pendingItemsRef.current = items;
         pendingBaseItemsRef.current = baseItems;
@@ -448,21 +454,32 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         }, delayMs);
       },
     });
-  }, [cancelQueuedSaves, previewSimulation, saveMutation]);
+  }, [cancelQueuedSaves, onShowToast, previewSimulation, saveMutation]);
 
   useEffect(() => () => {
     if (pickSaveTimerRef.current) clearTimeout(pickSaveTimerRef.current);
     if (orderSaveTimerRef.current) clearTimeout(orderSaveTimerRef.current);
   }, []);
 
-  const updateFeaturedItems = useCallback((nextItems, { delayMs = PICK_SAVE_MS } = {}) => {
-    const previousItems = queryClient.getQueryData(queryKeys.featuredProducts())?.items || [];
-    queryClient.setQueryData(queryKeys.featuredProducts(), (prev) => ({
-      items: nextItems,
-      updatedAt: prev?.updatedAt || null,
-    }));
-    queueSave(nextItems, delayMs, previousItems);
-  }, [queryClient, queueSave]);
+  const updateFeaturedItems = useCallback((nextItems, { saveImmediately = false, delayMs = PICK_SAVE_MS } = {}) => {
+    setDraftItems(nextItems);
+    if (saveImmediately) queueSave(nextItems, delayMs, savedFeaturedItems);
+  }, [queueSave, savedFeaturedItems]);
+
+  const saveDraft = useCallback(() => {
+    if (!hasUnsavedChanges) return;
+    queueSave(featuredItems, 0, savedFeaturedItems);
+  }, [featuredItems, hasUnsavedChanges, queueSave, savedFeaturedItems]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined;
+    const warnBeforeLeaving = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [hasUnsavedChanges]);
 
   const toggleFeatured = useCallback((sku, checked) => {
     const normalized = String(sku || '').trim().toUpperCase();
@@ -485,29 +502,15 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const removeFeatured = useCallback((sku) => {
     const normalized = String(sku || '').trim().toUpperCase();
     if (!window.confirm(`Remove ${normalized} from featured products?`)) return;
-    // A pick from up to 2s ago may still be waiting to save, and its payload
-    // still contains this product. Drop it — this edit supersedes it.
-    cancelQueuedSaves();
-    const seq = (editSeqRef.current += 1);
-    const next = featuredItems.filter((item) => item.sku !== normalized);
-    queryClient.setQueryData(queryKeys.featuredProducts(), (prev) => ({
-      items: next,
-      updatedAt: prev?.updatedAt || null,
-    }));
-    if (previewSimulation) {
-      setSaveState('preview');
-      return;
-    }
-    setSaveState('saving');
-    saveMutation.mutate({ items: next, seq, baseItems: featuredItems });
-  }, [cancelQueuedSaves, featuredItems, previewSimulation, queryClient, saveMutation]);
+    updateFeaturedItems(featuredItems.filter((item) => item.sku !== normalized));
+  }, [featuredItems, updateFeaturedItems]);
 
   const handleReorder = useCallback((nextProducts) => {
     const skuOrder = nextProducts.map((p) => p.sku);
     const bySku = new Map(featuredItems.map((item) => [item.sku, item]));
     const nextItems = skuOrder.map((sku) => bySku.get(sku)).filter(Boolean);
-    updateFeaturedItems(nextItems, { delayMs: ORDER_SAVE_MS });
-  }, [featuredItems, updateFeaturedItems]);
+    setDraftItems(nextItems);
+  }, [featuredItems]);
 
   const slotsRemaining = Math.max(0, FEATURED_SOFT_CAP - featuredItems.length);
   const overSoftCap = featuredItems.length > FEATURED_SOFT_CAP;
@@ -541,12 +544,16 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
             </span>
           ) : saveState === 'error' ? (
             <span className="adm-pill" role="status" style={{ fontSize: 12, color: '#b91c1c', borderColor: '#fecaca' }}>
-              Save failed — list refreshed
+              Save failed — your changes are still here
             </span>
-          ) : saveState === 'saving' || saveState === 'pending' ? (
+          ) : saveState === 'saving' ? (
             <span className="adm-pill" role="status" style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Loader2 size={12} className="spin" />
-              {saveState === 'pending' ? 'Changes queued…' : 'Saving order…'}
+              Saving featured products…
+            </span>
+          ) : hasUnsavedChanges ? (
+            <span className="adm-pill" role="status" style={{ fontSize: 12, color: '#92400e', borderColor: '#fcd34d' }}>
+              Changes not saved yet
             </span>
           ) : saveMeta.updatedAt && formatSortSavedAt(saveMeta.updatedAt) && (
             <span className="adm-pill" role="status" style={{ fontSize: 12 }}>
@@ -556,24 +563,27 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         </div>
       </div>
 
-      <div className="adm-toolbar pm-toolbar" style={{ marginBottom: 12 }}>
-        <button
-          type="button"
-          className={`adm-btn-ghost adm-btn--sm${view === 'arrange' ? ' adm-tab--active' : ''}`}
-          onClick={() => setView('arrange')}
-        >
-          Arrange order
-        </button>
-        <button
-          type="button"
-          className={`adm-btn-ghost adm-btn--sm${view === 'pick' ? ' adm-tab--active' : ''}`}
-          onClick={() => setView('pick')}
-        >
-          Pick products
-        </button>
+      <div className="adm-toolbar pm-toolbar featured-workspace-toolbar" style={{ marginBottom: 12 }}>
         <span className="adm-pill" style={{ marginLeft: 'auto', fontSize: 12 }}>
           {featuredItems.length} featured · {slotsRemaining} slots remaining (of {FEATURED_SOFT_CAP})
         </span>
+        <button
+          type="button"
+          className="adm-btn-ghost adm-btn--sm"
+          onClick={() => setDraftItems(null)}
+          disabled={!hasUnsavedChanges || saving}
+        >
+          <RotateCcw size={14} /> Undo changes
+        </button>
+        <button
+          type="button"
+          className="adm-btn-green adm-btn--sm"
+          onClick={saveDraft}
+          disabled={!hasUnsavedChanges || saving}
+        >
+          {saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+          {previewSimulation ? 'Test save safely' : 'Save changes'}
+        </button>
       </div>
 
       {overSoftCap && (
@@ -582,8 +592,8 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         </p>
       )}
 
-      {view === 'arrange' && (
-        <>
+      <section className="featured-workspace-section" aria-labelledby="featured-current-heading">
+          <h3 id="featured-current-heading" className="featured-workspace-heading">1. Current featured products</h3>
           <div className="featured-order-guide" role="note">
             <Grip size={15} />
             <span>
@@ -624,11 +634,15 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
               />
             </>
           )}
-        </>
-      )}
+      </section>
 
-      {view === 'pick' && (
-        <>
+      <section className="featured-workspace-section" aria-labelledby="featured-add-heading">
+          <div className="featured-workspace-section-head">
+            <div>
+              <h3 id="featured-add-heading" className="featured-workspace-heading">2. Add more products</h3>
+              <p className="adm-section-note">Search the catalogue and add products. They appear at the end of the order above, ready to move.</p>
+            </div>
+          </div>
           <div className="adm-toolbar pm-toolbar" style={{ marginBottom: 12 }}>
             <label className="adm-search" style={{ flex: 1, minWidth: 200 }}>
               <Search size={15} />
@@ -662,16 +676,10 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
                   const product = catalogRowToProduct(row);
                   const checked = featuredSkuSet.has(product.sku);
                   return (
-                    <label
+                    <article
                       key={product.sku}
                       className={`featured-pick-card${checked ? ' featured-pick-card--selected' : ''}`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={saving}
-                        onChange={(e) => toggleFeatured(product.sku, e.target.checked)}
-                      />
                       <div className="adm-product-thumb featured-pick-thumb">
                         {product.image
                           ? <img src={product.image} alt="" loading="lazy" decoding="async" />
@@ -687,7 +695,16 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
                           )}
                         </div>
                       </div>
-                    </label>
+                      <button
+                        type="button"
+                        className={`featured-pick-action${checked ? ' featured-pick-action--selected' : ''}`}
+                        disabled={saving}
+                        onClick={() => toggleFeatured(product.sku, !checked)}
+                        aria-label={`${checked ? 'Remove' : 'Add'} ${product.name} ${checked ? 'from' : 'to'} featured products`}
+                      >
+                        {checked ? <><Check size={13} /> Featured</> : <><Plus size={13} /> Add</>}
+                      </button>
+                    </article>
                   );
                 })}
               </div>
@@ -719,8 +736,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
               )}
             </>
           )}
-        </>
-      )}
+      </section>
     </div>
   );
 }
