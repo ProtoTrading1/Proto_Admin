@@ -26,9 +26,19 @@ import {
 } from '../lib/featuredProducts';
 import { formatSortSavedAt } from '../lib/sortOrderStore';
 import { formatWebsitePrice } from '../lib/pricing';
+import { isReadOnlyPreviewHost } from '../lib/previewWriteGuard';
 
 const PICK_SAVE_MS = 2000;
 const ORDER_SAVE_MS = 600;
+
+export function dispatchFeaturedSave({ previewSimulation = false, items = [], onPreview, onLive } = {}) {
+  if (previewSimulation) {
+    onPreview?.(items);
+    return 'preview';
+  }
+  onLive?.(items);
+  return 'live';
+}
 
 const LINK_BTN = {
   background: 'none',
@@ -280,6 +290,8 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
 
 function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const queryClient = useQueryClient();
+  const previewSimulation = typeof window !== 'undefined'
+    && isReadOnlyPreviewHost(window.location.hostname);
   const [view, setView] = useState('arrange');
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -287,7 +299,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const [page, setPage] = useState(1);
   const [saveMeta, setSaveMeta] = useState({ updatedAt: null });
   const latestUpdatedAtRef = useRef(null);
-  const [saveState, setSaveState] = useState('saved');
+  const [saveState, setSaveState] = useState(previewSimulation ? 'preview' : 'saved');
   const pickSaveTimerRef = useRef(null);
   const orderSaveTimerRef = useRef(null);
   const pendingItemsRef = useRef(null);
@@ -417,19 +429,26 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
 
   const queueSave = useCallback((items, delayMs, baseItems) => {
     cancelQueuedSaves();
-    setSaveState('pending');
-    const seq = (editSeqRef.current += 1);
-    pendingItemsRef.current = items;
-    pendingBaseItemsRef.current = baseItems;
-    const timerRef = delayMs === PICK_SAVE_MS ? pickSaveTimerRef : orderSaveTimerRef;
-    timerRef.current = setTimeout(() => {
-      const payload = pendingItemsRef.current;
-      const baseItems = pendingBaseItemsRef.current;
-      pendingItemsRef.current = null;
-      pendingBaseItemsRef.current = null;
-      if (payload) saveMutation.mutate({ items: payload, seq, baseItems });
-    }, delayMs);
-  }, [cancelQueuedSaves, saveMutation]);
+    dispatchFeaturedSave({
+      previewSimulation,
+      items,
+      onPreview: () => setSaveState('preview'),
+      onLive: () => {
+        setSaveState('pending');
+        const seq = (editSeqRef.current += 1);
+        pendingItemsRef.current = items;
+        pendingBaseItemsRef.current = baseItems;
+        const timerRef = delayMs === PICK_SAVE_MS ? pickSaveTimerRef : orderSaveTimerRef;
+        timerRef.current = setTimeout(() => {
+          const payload = pendingItemsRef.current;
+          const pendingBaseItems = pendingBaseItemsRef.current;
+          pendingItemsRef.current = null;
+          pendingBaseItemsRef.current = null;
+          if (payload) saveMutation.mutate({ items: payload, seq, baseItems: pendingBaseItems });
+        }, delayMs);
+      },
+    });
+  }, [cancelQueuedSaves, previewSimulation, saveMutation]);
 
   useEffect(() => () => {
     if (pickSaveTimerRef.current) clearTimeout(pickSaveTimerRef.current);
@@ -475,9 +494,13 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
       items: next,
       updatedAt: prev?.updatedAt || null,
     }));
+    if (previewSimulation) {
+      setSaveState('preview');
+      return;
+    }
     setSaveState('saving');
     saveMutation.mutate({ items: next, seq, baseItems: featuredItems });
-  }, [cancelQueuedSaves, featuredItems, queryClient, saveMutation]);
+  }, [cancelQueuedSaves, featuredItems, previewSimulation, queryClient, saveMutation]);
 
   const handleReorder = useCallback((nextProducts) => {
     const skuOrder = nextProducts.map((p) => p.sku);
@@ -512,7 +535,11 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {saveState === 'error' ? (
+          {previewSimulation ? (
+            <span className="adm-pill" role="status" style={{ fontSize: 12, color: '#1d4ed8', borderColor: '#bfdbfe' }}>
+              Preview simulation — changes stay on this page
+            </span>
+          ) : saveState === 'error' ? (
             <span className="adm-pill" role="status" style={{ fontSize: 12, color: '#b91c1c', borderColor: '#fecaca' }}>
               Save failed — list refreshed
             </span>
@@ -559,7 +586,11 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         <>
           <div className="featured-order-guide" role="note">
             <Grip size={15} />
-            <span>Drag any handle to set the live storefront sequence. Use arrow keys or the tile controls for precise moves.</span>
+            <span>
+              {previewSimulation
+                ? 'Try dragging, arrow keys or tile controls. Preview changes are temporary and never saved.'
+                : 'Drag any handle to set the live storefront sequence. Use arrow keys or the tile controls for precise moves.'}
+            </span>
           </div>
           {featuredQuery.isLoading ? (
             <p className="adm-section-note"><Loader2 size={14} className="spin" /> Loading featured products…</p>

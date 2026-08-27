@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { moveFlatListItem, reorderFlatList } from '../src/components/FeaturedPanel';
+import { dispatchFeaturedSave, moveFlatListItem, reorderFlatList } from '../src/components/FeaturedPanel';
 import { saveFeaturedProducts } from '../src/lib/featuredProducts';
 
 const products = [
@@ -29,6 +29,26 @@ describe('featured storefront order grid', () => {
   it('leaves the order untouched for invalid drag targets', () => {
     expect(reorderFlatList(products, 'A', 'A')).toBe(products);
     expect(reorderFlatList(products, 'missing', 'B')).toBe(products);
+  });
+
+  it('simulates preview edits without calling the live save path', () => {
+    const onPreview = vi.fn();
+    const onLive = vi.fn();
+
+    expect(dispatchFeaturedSave({ previewSimulation: true, items: products, onPreview, onLive }))
+      .toBe('preview');
+    expect(onPreview).toHaveBeenCalledWith(products);
+    expect(onLive).not.toHaveBeenCalled();
+  });
+
+  it('keeps the production save path unchanged', () => {
+    const onPreview = vi.fn();
+    const onLive = vi.fn();
+
+    expect(dispatchFeaturedSave({ previewSimulation: false, items: products, onPreview, onLive }))
+      .toBe('live');
+    expect(onLive).toHaveBeenCalledWith(products);
+    expect(onPreview).not.toHaveBeenCalled();
   });
 
   it('persists the exact visual sequence consumed by the live portal', async () => {
