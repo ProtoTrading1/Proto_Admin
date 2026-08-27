@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import SectionErrorBoundary from './SectionErrorBoundary';
 import DescriptionReplacePanel from './DescriptionReplacePanel';
+import ImageProcessingCentrePanel from './ImageProcessingCentrePanel';
 import { buildCatalogParams, useCatalogQuery } from '../hooks/useCatalog';
 import {
   BULK_IMAGE_REPLACE_MAX,
@@ -304,6 +305,10 @@ function BulkImageReplacePanelInner({ taxonomyTree = [], onShowToast, titleOnly 
       {mode === 'images' && (
       <>
       <StepTabs step={step} />
+
+      <div style={{ marginTop: 16, marginBottom: 16 }}>
+        <ImageProcessingCentrePanel onShowToast={onShowToast} />
+      </div>
 
       {step === 'select' && (
         <>
@@ -607,13 +612,5 @@ function BulkImageReplacePanelInner({ taxonomyTree = [], onShowToast, titleOnly 
       </>
       )}
     </div>
-  );
-}
-
-export default function BulkImageReplacePanel(props) {
-  return (
-    <SectionErrorBoundary name="image-replace" title="Image Replace crashed">
-      <BulkImageReplacePanelInner {...props} />
-    </SectionErrorBoundary>
   );
 }
