@@ -3,6 +3,13 @@ const PRODUCTION_HOSTS = new Set([
   'protoportal-admin-proto-team.vercel.app',
 ]);
 
+// This endpoint uses POST only because it accepts a filename batch. Its
+// implementation performs lookups and returns a review model; it does not
+// publish, upload, update, or delete anything.
+const READ_ONLY_PREVIEW_POST_PATHS = new Set([
+  '/api/product-loader-batch-lookup',
+]);
+
 export function isReadOnlyPreviewHost(hostname = '') {
   const host = String(hostname).trim().toLowerCase();
   return host.endsWith('.vercel.app') && !PRODUCTION_HOSTS.has(host);
@@ -14,7 +21,9 @@ export function shouldBlockPreviewRequest({ hostname = '', origin = '', url = ''
 
   try {
     const target = new URL(String(url), origin);
-    return target.origin === origin && target.pathname.startsWith('/api/');
+    if (target.origin !== origin || !target.pathname.startsWith('/api/')) return false;
+    if (String(method).toUpperCase() === 'POST' && READ_ONLY_PREVIEW_POST_PATHS.has(target.pathname)) return false;
+    return true;
   } catch {
     return false;
   }

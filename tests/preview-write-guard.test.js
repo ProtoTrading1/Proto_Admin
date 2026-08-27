@@ -20,6 +20,29 @@ describe('preview write guard', () => {
     expect(shouldBlockPreviewRequest({ ...request, method: 'GET' })).toBe(false);
   });
 
+  it('allows the Product Loader filename lookup but still blocks publishing', () => {
+    const request = {
+      hostname: 'protoportal-admin-example-proto-team.vercel.app',
+      origin: 'https://protoportal-admin-example-proto-team.vercel.app',
+    };
+
+    expect(shouldBlockPreviewRequest({
+      ...request,
+      url: '/api/product-loader-batch-lookup',
+      method: 'POST',
+    })).toBe(false);
+    expect(shouldBlockPreviewRequest({
+      ...request,
+      url: '/api/product-loader-publish',
+      method: 'POST',
+    })).toBe(true);
+    expect(shouldBlockPreviewRequest({
+      ...request,
+      url: '/api/product-loader-image-replace',
+      method: 'POST',
+    })).toBe(true);
+  });
+
   it('does not interfere with authentication or other external services', () => {
     expect(shouldBlockPreviewRequest({
       hostname: 'protoportal-admin-example-proto-team.vercel.app',
