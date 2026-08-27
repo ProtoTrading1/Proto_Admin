@@ -2100,7 +2100,9 @@ export default function ProductManagerEngine({
                       {status === 'archived' && archiveStockView === 'negative'
                         ? 'No live products with negative stock.'
                         : status === 'archived'
-                          ? 'No archived products (zero-stock items are hidden).'
+                          ? archiveSection === 'new-images'
+                            ? 'No new image items have been sent to Archive today.'
+                            : 'No older archived products (zero-stock items are hidden).'
                           : 'No products in this view.'}
                     </p>
                   )}

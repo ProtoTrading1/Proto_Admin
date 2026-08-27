@@ -272,6 +272,11 @@ export async function completeWorkerOutput(job, image, payload = {}) {
   const transparentPrivatePath = await storeTransparentMaster(job, image, transparentMaster, runId);
   const websiteReady = await createWebsiteReadyDerivative(transparentMaster);
   const websiteReadyStorage = await uploadWebsiteReadyDerivative(job, image, websiteReady.buffer, runId);
+  await assertReviewAssetsAvailable({
+    ...image,
+    outputStoragePath: websiteReadyStorage.path,
+    processed: { websiteReady: websiteReadyStorage },
+  });
   const quality = await analyzeImageQuality(websiteReady.buffer);
   const workerWarnings = Array.isArray(payload.warnings)
     ? payload.warnings.map((warning) => String(warning).slice(0, 120)).slice(0, 20)
@@ -333,6 +338,11 @@ export async function processImageWithFal(job, image, providerOptions = {}) {
   const transparentPrivatePath = await storeTransparentMaster(job, materialized, standardized.buffer, runId);
   const websiteReady = await createWebsiteReadyDerivative(standardized.buffer);
   const websiteReadyStorage = await uploadWebsiteReadyDerivative(job, materialized, websiteReady.buffer, runId);
+  await assertReviewAssetsAvailable({
+    ...materialized,
+    outputStoragePath: websiteReadyStorage.path,
+    processed: { websiteReady: websiteReadyStorage },
+  });
   const measuredQuality = await analyzeImageQuality(websiteReady.buffer);
   const preservationWarning = preservation.suspicious
     ? ['possible_removed_label_or_light_product_part']
@@ -381,6 +391,36 @@ export async function processImageWithFal(job, image, providerOptions = {}) {
     },
     error: null,
   };
+}
+
+function reviewAssetUnavailable(message) {
+  const error = new Error(message);
+  error.code = 'ipc_review_assets_unavailable';
+  return error;
+}
+
+export async function assertReviewAssetsAvailable(image) {
+  const sourcePath = String(image?.source?.privatePath || '');
+  const outputPath = String(
+    image?.archive?.websiteReadyPath
+    || image?.outputStoragePath
+    || image?.processed?.websiteReady?.path
+    || '',
+  );
+  const isPrivateReviewAsset = (path) => path.startsWith('image-processing/sources/');
+  if (!isPrivateReviewAsset(sourcePath) || !isPrivateReviewAsset(outputPath)) {
+    throw reviewAssetUnavailable('The retained original or website-ready review asset is missing. Reprocess this image before approval.');
+  }
+  try {
+    await Promise.all([
+      downloadPrivateSource(sourcePath),
+      downloadPrivateSource(outputPath),
+      createPrivateSourceUrl(sourcePath, 60),
+      createPrivateSourceUrl(outputPath, 60),
+    ]);
+  } catch {
+    throw reviewAssetUnavailable('The retained original or website-ready review asset is unavailable. Reprocess this image before approval.');
+  }
 }
 
 export function targetedRepairAssetId(job, image) {

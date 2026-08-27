@@ -11,6 +11,7 @@ import {
   ingestStagedSource,
   estimatedImageCostUsd,
   clearUnpublishedImage,
+  assertReviewAssetsAvailable,
   createTargetedRepairRevision,
   applyArchivedImage,
   assignImageDestination,
@@ -375,7 +376,8 @@ async function runFalProcessing(res, actor, job, index) {
 
     const saved = await persistJob(runningJob);
     terminalPersisted = true;
-    return res.status(200).json({ ok: true, job: publicImageJob(saved, saved.images[runningIndex]) });
+    const [publicJob] = await publicJobItemsWithSource(saved, [saved.images[runningIndex]]);
+    return res.status(200).json({ ok: true, job: publicJob });
   } finally {
     if (terminalPersisted) {
       await releaseImageObjectClaim(FAL_RUN_CLAIM_JOB, scope, runClaim.id).catch(() => {});
@@ -387,11 +389,24 @@ async function runFalProcessing(res, actor, job, index) {
 async function publicJobItemsWithSource(job, images = job?.images || []) {
   return Promise.all(images.map(async (image) => {
     const row = publicImageJob(job, image);
-    if (!image.source?.privatePath) return row;
-    try {
-      row.before_url = await createPrivateSourceUrl(image.source.privatePath, 600);
-      row.original_url = row.before_url;
-    } catch { /* preview remains unavailable until the next refresh */ }
+    let previewError = null;
+    if (image.status === 'review') {
+      try {
+        await assertReviewAssetsAvailable(image);
+      } catch (error) {
+        previewError = error.message || 'The retained review assets are unavailable.';
+      }
+    }
+    if (image.source?.privatePath && !previewError) {
+      try {
+        row.before_url = await createPrivateSourceUrl(image.source.privatePath, 600);
+        row.original_url = row.before_url;
+      } catch {
+        previewError = 'The retained original is unavailable.';
+      }
+    } else if (image.status === 'review' && !image.source?.privatePath) {
+      previewError = 'The retained original is missing.';
+    }
     const reviewPath = image.archive?.websiteReadyPath || image.outputStoragePath || image.processed?.websiteReady?.path;
     if (String(reviewPath || '').startsWith('image-processing/sources/')) {
       try {
@@ -400,7 +415,20 @@ async function publicJobItemsWithSource(job, images = job?.images || []) {
         row.processed_url = reviewUrl;
         if (row.website_ready) row.website_ready = { ...row.website_ready, url: reviewUrl };
         if (row.archive) row.archive = { ...row.archive, websiteReadyUrl: reviewUrl };
-      } catch { /* a later owner refresh will mint a fresh review URL */ }
+      } catch {
+        previewError = previewError || 'The website-ready review asset is unavailable.';
+      }
+    } else if (image.status === 'review') {
+      previewError = previewError || 'The website-ready review asset is missing.';
+    }
+    if (image.status === 'review' && (!row.before_url || !row.after_url || previewError)) {
+      row.status = 'failed';
+      row.before_url = '';
+      row.original_url = '';
+      row.after_url = '';
+      row.processed_url = '';
+      row.error = previewError || 'The retained review assets are unavailable.';
+      row.quality_flags = [...new Set([...(row.quality_flags || []), 'review_assets_unavailable'])];
     }
     return row;
   }));
@@ -515,6 +543,7 @@ async function reviewAction(req, res, actor, action) {
     } else if (action === 'execute') {
       return await runFalProcessing(res, actor, job, index);
     } else if (action === 'approve') {
+      await assertReviewAssetsAvailable(job.images[index]);
       job.images[index] = markImageApproved(job.images[index], {
         actor,
         reviewChecklist: req.body?.reviewChecklist,
@@ -586,9 +615,10 @@ async function reviewAction(req, res, actor, action) {
       });
     }
     const saved = await persistJob(job);
-    return res.status(200).json({ ok: true, job: publicImageJob(saved, saved.images[index]) });
+    const [publicJob] = await publicJobItemsWithSource(saved, [saved.images[index]]);
+    return res.status(200).json({ ok: true, job: publicJob });
   } catch (error) {
-    const status = ['image_exists', 'ipc_destination_conflict', 'ipc_job_destination_conflict', 'ipc_product_conflict', 'ipc_product_image_conflict', 'ipc_restore_conflict', 'ipc_archive_confirmation_required', 'ipc_archive_snapshot_required', 'ipc_repair_stale_asset', 'ipc_repair_geometry_changed'].includes(error.code)
+    const status = ['image_exists', 'ipc_destination_conflict', 'ipc_job_destination_conflict', 'ipc_product_conflict', 'ipc_product_image_conflict', 'ipc_restore_conflict', 'ipc_archive_confirmation_required', 'ipc_archive_snapshot_required', 'ipc_repair_stale_asset', 'ipc_repair_geometry_changed', 'ipc_review_assets_unavailable'].includes(error.code)
       ? 409
       : error.code === 'ipc_production_only'
         ? 403

@@ -124,7 +124,7 @@ export function buildComposedEmail({ subject, introText = '', htmlBlock = '' }, 
   const htmlPart = html ? stripDangerousHtml(applyMergeTags(html, vars)) : '';
   const bodyHtml = [introHtml, htmlPart].filter(Boolean).join('\n') || '<p></p>';
   const textContent = buildComposedText({ introText, htmlBlock }, vars);
-  const htmlContent = wrapBroadcastHtml({ subject: personalizedSubject, bodyHtml });
+  const htmlContent = wrapBroadcastHtml({ subject: personalizedSubject, bodyHtml, vars, includeUnsubscribe: true });
   return { subject: personalizedSubject, htmlContent, textContent, bodyHtml };
 }
 
@@ -132,14 +132,24 @@ export function buildComposedText({ introText = '', htmlBlock = '' }, vars = {})
   const parts = [];
   if (introText.trim()) parts.push(applyMergeTags(introText, vars));
   if (htmlBlock.trim()) parts.push(htmlToText(applyMergeTags(htmlBlock, vars)));
-  return parts.join('\n\n').trim();
+  const body = parts.join('\n\n').trim();
+  const url = vars.unsubscribe_url || vars.unsubscribe || buildUnsubscribeUrl(vars.email);
+  const footer = url ? `You are receiving this because you are a Proto customer/contact. To stop receiving marketing emails from Proto, unsubscribe here: ${url}` : '';
+  return [body, footer].filter(Boolean).join('\n\n');
 }
 
-export function wrapBroadcastHtml({ subject, bodyHtml }) {
+export function wrapBroadcastHtml({ subject, bodyHtml, vars = {}, includeUnsubscribe = false }) {
   const safeBody = bodyHtml || '<p>Hello from Proto Trading.</p>';
-  // No footer/button — the email ends with the composed body.
+  const unsubscribeUrl = vars.unsubscribe_url || vars.unsubscribe || buildUnsubscribeUrl(vars.email);
+  const unsubscribeFooter = includeUnsubscribe && unsubscribeUrl ? `
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0 16px;" />
+  <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.5;">
+    You are receiving this because you are a Proto customer/contact.<br />
+    <a href="${escapeHtml(unsubscribeUrl)}" style="color:#2563eb;">Unsubscribe from Proto marketing emails</a>
+  </p>` : '';
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;margin:0 auto;padding:24px;">
   ${safeBody}
+  ${unsubscribeFooter}
 </body></html>`;
 }
 
@@ -235,8 +245,7 @@ async function fetchOptedOutEmails(sb, emails = []) {
       .in('email', chunk);
     if (error) {
       if (/marketing_email_opt_outs/i.test(error.message || '')) {
-        console.warn('marketing_email_opt_outs table is not available; broadcasts cannot filter opt-outs yet.');
-        return optedOut;
+        throw new Error('Marketing unsubscribe protection is unavailable. Apply migration 064 before sending broadcasts.');
       }
       throw error;
     }

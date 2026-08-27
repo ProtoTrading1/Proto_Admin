@@ -3040,6 +3040,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                           </div>
                           <div data-label="Customer">
                             <div style={{ fontWeight: 600, fontSize: 13 }}>{order.customers?.name || 'Unknown'}</div>
+                            {order.customers?.business_name && (
+                              <div style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>{order.customers.business_name}</div>
+                            )}
                             <div className="adm-muted" style={{ fontSize: 11 }}>{order.customers?.email || ''}</div>
                           </div>
                           <div data-label="Date">
