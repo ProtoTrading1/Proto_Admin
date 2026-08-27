@@ -284,6 +284,21 @@ describe('Image Processing Centre backend contracts', () => {
     expect(workerRoute).not.toContain('requireOwner(req, res)');
   });
 
+  it('hydrates signed review previews in completed and later queue-action responses', () => {
+    const ownerRoute = readFileSync(join(ROOT, 'api/image-processing-jobs.js'), 'utf8');
+    expect(ownerRoute).toContain('if (image.source?.privatePath && !previewError) {');
+    expect(ownerRoute).toContain('const reviewPath = image.archive?.websiteReadyPath || image.outputStoragePath || image.processed?.websiteReady?.path;');
+    expect(ownerRoute).toContain("if (image.status === 'review' && (!row.before_url || !row.after_url || previewError)) {");
+    expect(ownerRoute).toContain("row.status = 'failed';");
+    expect(ownerRoute).toContain('await assertReviewAssetsAvailable(job.images[index]);');
+    const service = readFileSync(join(ROOT, 'api/_image-processing-service.js'), 'utf8');
+    expect(service).toContain('export async function assertReviewAssetsAvailable(image)');
+    expect(service).toContain('await assertReviewAssetsAvailable({');
+    expect(ownerRoute).toContain('const [publicJob] = await publicJobItemsWithSource(saved, [saved.images[runningIndex]]);');
+    expect(ownerRoute).toContain('const [publicJob] = await publicJobItemsWithSource(saved, [saved.images[index]]);');
+    expect(ownerRoute).not.toContain('if (!image.source?.privatePath) return row;');
+  });
+
   it('parses real multipart folder uploads into bounded base64 ingestion items', async () => {
     const boundary = 'proto-image-boundary-AaB03x';
     const binary = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x42]);
@@ -517,3 +532,4 @@ describe('Image Processing Centre backend contracts', () => {
     expect(calls).toBe(0);
   });
 });
+

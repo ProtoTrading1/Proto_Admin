@@ -11,9 +11,11 @@ globalThis.React = React;
 const mocks = vi.hoisted(() => ({
   currentJob: null,
   claimImageObject: vi.fn(),
+  createPrivateSourceUrl: vi.fn(),
   releaseImageObjectClaim: vi.fn(),
   processImageWithFal: vi.fn(),
   persistJob: vi.fn(),
+  assertReviewAssetsAvailable: vi.fn(),
 }));
 
 vi.mock('../api/_admin-auth.js', () => ({
@@ -24,7 +26,7 @@ vi.mock('../api/_admin-auth.js', () => ({
 
 vi.mock('../api/_image-processing-store.js', () => ({
   claimImageObject: mocks.claimImageObject,
-  createPrivateSourceUrl: vi.fn(async () => '/original/ABC1.png'),
+  createPrivateSourceUrl: mocks.createPrivateSourceUrl,
   readImageJob: vi.fn(async () => mocks.currentJob),
   readImageJobIndex: vi.fn(async () => []),
   releaseImageObjectClaim: mocks.releaseImageObjectClaim,
@@ -32,6 +34,7 @@ vi.mock('../api/_image-processing-store.js', () => ({
 
 vi.mock('../api/_image-processing-service.js', () => ({
   estimatedImageCostUsd: vi.fn(() => 0.018),
+  assertReviewAssetsAvailable: mocks.assertReviewAssetsAvailable,
   ingestLocalSource: vi.fn(),
   ingestStagedSource: vi.fn(),
   markImageApproved: vi.fn(),
@@ -40,6 +43,7 @@ vi.mock('../api/_image-processing-service.js', () => ({
   publishApprovedImage: vi.fn(),
   rejectImage: vi.fn(),
   restorePublishedOriginal: vi.fn(),
+  targetedRepairAssetId: vi.fn(() => 'asset-test'),
 }));
 
 import handler from '../api/image-processing-jobs.js';
@@ -56,7 +60,8 @@ function imageJob(status = 'queued') {
       slot: 1,
       targetTable: 'website_stock',
       status,
-      source: { type: 'local_upload', filename: 'ABC1.png', privatePath: 'source/ABC1.png' },
+      source: { type: 'local_upload', filename: 'ABC1.png', privatePath: 'image-processing/sources/manifest-1/image-1.png' },
+      outputStoragePath: status === 'review' ? 'image-processing/sources/manifest-1/image-1-review.jpg' : null,
       processing: status === 'processing' ? { provider: 'fal.ai', claimId: 'start-claim' } : null,
     }],
   };
@@ -89,6 +94,8 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
     mocks.currentJob = imageJob('queued');
     mocks.claimImageObject.mockResolvedValue({ id: 'claim-1' });
     mocks.releaseImageObjectClaim.mockResolvedValue(true);
+    mocks.createPrivateSourceUrl.mockResolvedValue('/signed/ABC1.png');
+    mocks.assertReviewAssetsAvailable.mockResolvedValue(undefined);
     mocks.persistJob.mockImplementation(async (job) => {
       mocks.currentJob = structuredClone(job);
       return mocks.currentJob;
@@ -97,6 +104,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
       ...image,
       status: 'review',
       reviewUrl: '/processed/ABC1.png',
+      outputStoragePath: 'image-processing/sources/manifest-1/image-1-review.jpg',
     }));
   });
 
@@ -126,6 +134,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
       ...image,
       status: 'review',
       reviewUrl: '/processed/ABC1.png',
+      outputStoragePath: 'image-processing/sources/manifest-1/image-1-review.jpg',
     }));
 
     const firstRes = response();
@@ -136,9 +145,43 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
 
     expect.soft(mocks.processImageWithFal).toHaveBeenCalledTimes(1);
     expect.soft(firstRes.statusCode).toBe(200);
-    expect.soft(firstRes.body?.job).toMatchObject({ status: 'review', after_url: '/processed/ABC1.png' });
+    expect.soft(firstRes.body?.job).toMatchObject({ status: 'review', after_url: '/signed/ABC1.png' });
     expect.soft([202, 409]).toContain(secondRes.statusCode);
     expect.soft(mocks.releaseImageObjectClaim).toHaveBeenCalled();
+  });
+
+  it('downgrades a review item to retryable failure when either preview cannot be signed', async () => {
+    mocks.currentJob = imageJob('review');
+    mocks.createPrivateSourceUrl
+      .mockResolvedValueOnce('/signed/original.png')
+      .mockRejectedValueOnce(new Error('storage object missing'));
+    const res = response();
+
+    await handler({ method: 'GET', query: { id: 'manifest-1~image-1' }, headers: {} }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.jobs[0]).toMatchObject({
+      status: 'failed',
+      before_url: '',
+      after_url: '',
+      error: 'The website-ready review asset is unavailable.',
+    });
+    expect(res.body.jobs[0].quality_flags).toContain('review_assets_unavailable');
+  });
+
+  it('rejects approval when the retained review assets can no longer be signed', async () => {
+    mocks.currentJob = imageJob('review');
+    mocks.assertReviewAssetsAvailable.mockRejectedValue(Object.assign(
+      new Error('The retained original or website-ready review asset is unavailable. Reprocess this image before approval.'),
+      { code: 'ipc_review_assets_unavailable' },
+    ));
+    const res = response();
+
+    await handler(request('approve'), res);
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error).toMatch(/unavailable/i);
+    expect(mocks.persistJob).not.toHaveBeenCalled();
   });
 
   it('safely adopts a legacy processing job only after the old inline request cannot still be running', async () => {
@@ -155,7 +198,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
     await handler(request('execute'), res);
 
     expect.soft(res.statusCode).toBe(200);
-    expect.soft(res.body?.job).toMatchObject({ status: 'review', after_url: '/processed/ABC1.png' });
+    expect.soft(res.body?.job).toMatchObject({ status: 'review', after_url: '/signed/ABC1.png' });
     expect.soft(mocks.processImageWithFal).toHaveBeenCalledTimes(1);
     expect.soft(mocks.persistJob.mock.calls.some(([saved]) => (
       saved.images[0].processing?.claimId === 'legacy-recovery-claim'
@@ -226,7 +269,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5_000);
       });
-      expect(container.querySelector('img[alt="Website-ready white 1600 × 1600 product"]')?.getAttribute('src')).toBe('/processed/ABC1.png');
+      expect(container.querySelector('img[alt="Website-ready white 1600 Ã— 1600 product"]')?.getAttribute('src')).toBe('/processed/ABC1.png');
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(24_000);
@@ -265,6 +308,10 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
         root.render(React.createElement(ImageProcessingCentre));
         await Promise.resolve();
       });
+      await act(async () => {
+        container.querySelector('input[name="image-processing-preset"][value="standard_opaque"]').click();
+        await Promise.resolve();
+      });
 
       const imageInput = container.querySelectorAll('.ipc-file-input')[1];
       const file = {
@@ -279,7 +326,9 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
         await Promise.resolve();
         await Promise.resolve();
       });
-      expect(container.textContent).toContain('NEW-PHOTO.png');
+      await vi.waitFor(() => {
+        expect(container.textContent).toContain('NEW-PHOTO.png');
+      });
 
       await act(async () => {
         resolveInitialQueue(jsonResponse({ jobs: [] }));
@@ -292,8 +341,58 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
       container.remove();
     }
   });
+
+  it.each([
+    { before_url: '', after_url: '/processed/8610700004-50pcs.JPG' },
+    { before_url: '/original/8610700004-50pcs.JPG', after_url: '' },
+  ])('blocks approval and clearly reports an incomplete review when a required preview is missing', async ({ before_url, after_url }) => {
+    const incompleteReview = {
+      id: 'job-incomplete', filename: '8610700004-50pcs.JPG', sku: '8610700004',
+      status: 'review', quality_score: 100, quality_flags: [],
+      before_url, after_url,
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, options = {}) => {
+      if (!options.method || options.method === 'GET') return Promise.resolve(jsonResponse({ jobs: [incompleteReview] }));
+      throw new Error(`Unexpected image request: ${options.method}`);
+    });
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    try {
+      await act(async () => {
+        root.render(React.createElement(ImageProcessingCentre));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const reviewCheckbox = container.querySelector('.ipc-review-checklist-primary input');
+      await act(async () => {
+        reviewCheckbox.click();
+        await Promise.resolve();
+      });
+
+      expect(container.textContent).toContain('Review incomplete: the retained original or website-ready preview is unavailable. Approval is blocked.');
+      const approveButton = [...container.querySelectorAll('button')]
+        .find((button) => button.textContent.includes('Approve result'));
+      expect(approveButton).toBeTruthy();
+      expect(approveButton.disabled).toBe(true);
+
+      await act(async () => {
+        approveButton.click();
+        await Promise.resolve();
+      });
+      expect(fetchMock.mock.calls.some(([, options = {}]) => (
+        options.method === 'PATCH' && JSON.parse(options.body).action === 'approve'
+      ))).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+    }
+  });
 });
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
+

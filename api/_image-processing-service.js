@@ -226,7 +226,7 @@ export async function analyzeImageQuality(buffer) {
 
 // The cut-out is retained privately as the reusable master. The review and
 // archive derivative is deliberately what the customer will see: a consistent
-// 1600 × 1600 white JPEG, rather than a transparent image on an unknown page.
+// 1600 Ã— 1600 white JPEG, rather than a transparent image on an unknown page.
 export async function createWebsiteReadyDerivative(masterBuffer, { size = 1600 } = {}) {
   const master = await Jimp.read(masterBuffer);
   const canvas = new Jimp({ width: size, height: size, color: 0xffffffff });
@@ -272,6 +272,11 @@ export async function completeWorkerOutput(job, image, payload = {}) {
   const transparentPrivatePath = await storeTransparentMaster(job, image, transparentMaster, runId);
   const websiteReady = await createWebsiteReadyDerivative(transparentMaster);
   const websiteReadyStorage = await uploadWebsiteReadyDerivative(job, image, websiteReady.buffer, runId);
+  await assertReviewAssetsAvailable({
+    ...image,
+    outputStoragePath: websiteReadyStorage.path,
+    processed: { websiteReady: websiteReadyStorage },
+  });
   const quality = await analyzeImageQuality(websiteReady.buffer);
   const workerWarnings = Array.isArray(payload.warnings)
     ? payload.warnings.map((warning) => String(warning).slice(0, 120)).slice(0, 20)
@@ -333,6 +338,11 @@ export async function processImageWithFal(job, image, providerOptions = {}) {
   const transparentPrivatePath = await storeTransparentMaster(job, materialized, standardized.buffer, runId);
   const websiteReady = await createWebsiteReadyDerivative(standardized.buffer);
   const websiteReadyStorage = await uploadWebsiteReadyDerivative(job, materialized, websiteReady.buffer, runId);
+  await assertReviewAssetsAvailable({
+    ...materialized,
+    outputStoragePath: websiteReadyStorage.path,
+    processed: { websiteReady: websiteReadyStorage },
+  });
   const measuredQuality = await analyzeImageQuality(websiteReady.buffer);
   const preservationWarning = preservation.suspicious
     ? ['possible_removed_label_or_light_product_part']
@@ -381,6 +391,42 @@ export async function processImageWithFal(job, image, providerOptions = {}) {
     },
     error: null,
   };
+}
+
+function reviewAssetUnavailable(message) {
+  const error = new Error(message);
+  error.code = 'ipc_review_assets_unavailable';
+  return error;
+}
+
+/**
+ * A review item is approval-eligible only when the retained original and the
+ * private website-ready derivative can both be signed. This is intentionally
+ * checked at transition time and again before approval because storage assets
+ * can be removed or become unavailable after processing finishes.
+ */
+export async function assertReviewAssetsAvailable(image) {
+  const sourcePath = String(image?.source?.privatePath || '');
+  const outputPath = String(
+    image?.archive?.websiteReadyPath
+    || image?.outputStoragePath
+    || image?.processed?.websiteReady?.path
+    || '',
+  );
+  const isPrivateReviewAsset = (path) => path.startsWith('image-processing/sources/');
+  if (!isPrivateReviewAsset(sourcePath) || !isPrivateReviewAsset(outputPath)) {
+    throw reviewAssetUnavailable('The retained original or website-ready review asset is missing. Reprocess this image before approval.');
+  }
+  try {
+    await Promise.all([
+      downloadPrivateSource(sourcePath),
+      downloadPrivateSource(outputPath),
+      createPrivateSourceUrl(sourcePath, 60),
+      createPrivateSourceUrl(outputPath, 60),
+    ]);
+  } catch {
+    throw reviewAssetUnavailable('The retained original or website-ready review asset is unavailable. Reprocess this image before approval.');
+  }
 }
 
 export function targetedRepairAssetId(job, image) {
@@ -688,7 +734,7 @@ function resolvedProductDestination(image, requestedSlot = image.slot) {
   )) {
     throw imageProcessingError(
       'ipc_destination_conflict',
-      'This image’s saved Product Manager destination no longer matches its SKU. It was not sent anywhere.',
+      'This imageâ€™s saved Product Manager destination no longer matches its SKU. It was not sent anywhere.',
     );
   }
   return destination;
@@ -1150,3 +1196,4 @@ export async function rejectImage(image, { actor, reason = '' } = {}) {
     rejectionReason: String(reason || '').trim().slice(0, 500) || null,
   };
 }
+
