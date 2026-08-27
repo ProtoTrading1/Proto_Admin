@@ -18,7 +18,10 @@ export default function QueryProvider({ children }) {
           shouldDehydrateQuery: (query) => {
             if (query.state.status !== 'success') return false;
             const key = query.queryKey[0];
-            return key !== 'catalog';
+            // Featured drafts must remain session-only: persisting them could
+            // expose one admin's abandoned draft to the next person signing in
+            // on the same browser. The live list is tiny and refetches on mount.
+            return key !== 'catalog' && key !== 'featured-products';
           },
         },
       }}

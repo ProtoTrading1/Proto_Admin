@@ -445,6 +445,12 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   }, []);
 
   const updateDraftItems = useCallback((items) => {
+    if (!hasFeaturedChanges(savedFeaturedItems, items)) {
+      queryClient.removeQueries({ queryKey: FEATURED_DRAFT_QUERY_KEY, exact: true });
+      setDraft(null);
+      setSaveState(previewSimulation ? 'preview' : 'saved');
+      return;
+    }
     const next = {
       items,
       baseUpdatedAt: draft?.baseUpdatedAt || featuredQuery.data?.updatedAt || null,
@@ -452,7 +458,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     queryClient.setQueryData(FEATURED_DRAFT_QUERY_KEY, next);
     setDraft(next);
     setSaveState(previewSimulation ? 'preview' : 'saved');
-  }, [draft?.baseUpdatedAt, featuredQuery.data?.updatedAt, previewSimulation, queryClient]);
+  }, [draft?.baseUpdatedAt, featuredQuery.data?.updatedAt, previewSimulation, queryClient, savedFeaturedItems]);
 
   const clearDraft = useCallback(() => {
     cancelQueuedSaves();
