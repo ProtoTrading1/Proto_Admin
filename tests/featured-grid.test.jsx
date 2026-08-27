@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  addFeaturedItemToTop,
   canEditFeaturedList,
   dispatchFeaturedSave,
+  filterFeaturedProducts,
   hasFeaturedChanges,
   moveFlatListItem,
+  moveFlatListItemToTop,
   reorderFlatList,
 } from '../src/components/FeaturedPanel';
 import { saveFeaturedProducts } from '../src/lib/featuredProducts';
@@ -35,6 +38,40 @@ describe('featured storefront order grid', () => {
   it('leaves the order untouched for invalid drag targets', () => {
     expect(reorderFlatList(products, 'A', 'A')).toBe(products);
     expect(reorderFlatList(products, 'missing', 'B')).toBe(products);
+  });
+
+  it('moves any featured product straight to the top without losing its neighbours', () => {
+    expect(moveFlatListItemToTop(products, 'D').map((item) => item.sku))
+      .toEqual(['D', 'A', 'B', 'C']);
+    expect(moveFlatListItemToTop(products, 'B').map((item) => item.sku))
+      .toEqual(['B', 'A', 'C', 'D']);
+    expect(moveFlatListItemToTop(products, 'A')).toBe(products);
+    expect(moveFlatListItemToTop(products, 'missing')).toBe(products);
+  });
+
+  it('finds featured products by title, SKU or code without changing their saved order', () => {
+    const searchable = [
+      { id: 'A', sku: 'SKU-A', code: '10001', name: 'Blue Gift Bag' },
+      { id: 'B', sku: 'SKU-B', code: '20002', name: 'Red Ribbon' },
+      { id: 'C', sku: 'SPECIAL-C', code: '30003', name: 'Green Beads' },
+    ];
+
+    expect(filterFeaturedProducts(searchable, 'gift')).toEqual([searchable[0]]);
+    expect(filterFeaturedProducts(searchable, 'sku-b')).toEqual([searchable[1]]);
+    expect(filterFeaturedProducts(searchable, '30003')).toEqual([searchable[2]]);
+    expect(filterFeaturedProducts(searchable, '  ')).toBe(searchable);
+  });
+
+  it('adds a catalogue product directly to the top without duplicating products', () => {
+    const items = [
+      { sku: 'A', addedAt: '2026-08-27T09:00:00.000Z' },
+      { sku: 'B', addedAt: '2026-08-27T09:01:00.000Z' },
+    ];
+    const added = addFeaturedItemToTop(items, ' c ', '2026-08-27T10:00:00.000Z');
+
+    expect(added.map((item) => item.sku)).toEqual(['C', 'A', 'B']);
+    expect(addFeaturedItemToTop(items, 'A')).toBe(items);
+    expect(addFeaturedItemToTop(items, '')).toBe(items);
   });
 
   it('simulates preview edits without calling the live save path', () => {

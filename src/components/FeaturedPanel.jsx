@@ -9,10 +9,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpToLine,
   Check,
   Grip,
   Loader2,
-  Plus,
   RotateCcw,
   Save,
   Search,
@@ -124,7 +124,29 @@ export function moveFlatListItem(list, productId, delta) {
   return next;
 }
 
-function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
+export function moveFlatListItemToTop(list, productId) {
+  const from = list.findIndex((product) => product.id === productId);
+  if (from <= 0) return list;
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.unshift(item);
+  return next;
+}
+
+export function filterFeaturedProducts(products = [], query = '') {
+  const needle = String(query || '').trim().toLowerCase();
+  if (!needle) return products;
+  return products.filter((product) => [product.name, product.sku, product.code]
+    .some((value) => String(value || '').toLowerCase().includes(needle)));
+}
+
+export function addFeaturedItemToTop(items = [], sku, addedAt = new Date().toISOString()) {
+  const normalized = String(sku || '').trim().toUpperCase();
+  if (!normalized || items.some((item) => item.sku === normalized)) return items;
+  return [{ sku: normalized, addedAt }, ...items];
+}
+
+function FeaturedOrderList({ products, searchQuery = '', onReorder, onRemove, saving }) {
   const productsRef = useRef(products);
   productsRef.current = products;
   const onReorderRef = useRef(onReorder);
@@ -135,6 +157,11 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
   const endDragRef = useRef(null);
   const [dragId, setDragId] = useState(null);
   const [overId, setOverId] = useState(null);
+  const filtering = Boolean(searchQuery.trim());
+  const displayedProducts = useMemo(
+    () => filterFeaturedProducts(products, searchQuery),
+    [products, searchQuery],
+  );
 
   const clearDrag = useCallback(() => {
     dragIdRef.current = null;
@@ -202,6 +229,11 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
     onReorder(moveFlatListItem(products, productId, delta));
   }, [onReorder, products, saving]);
 
+  const moveToTop = useCallback((productId) => {
+    if (saving) return;
+    onReorder(moveFlatListItemToTop(products, productId));
+  }, [onReorder, products, saving]);
+
   const handleGripKeyDown = useCallback((productId, event) => {
     const columnCount = Number.parseInt(
       getComputedStyle(event.currentTarget.closest('.featured-order-grid'))
@@ -227,9 +259,19 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
     );
   }
 
+  if (!displayedProducts.length) {
+    return (
+      <p className="adm-section-note featured-current-empty">
+        No featured products match this search.
+      </p>
+    );
+  }
+
   return (
     <div className="featured-order-grid" role="list" aria-label="Featured products in storefront order">
-      {products.map((product, index) => (
+      {displayedProducts.map((product) => {
+        const index = products.findIndex((item) => item.id === product.id);
+        return (
         <div
           key={product.id}
           data-featured-id={product.id}
@@ -241,10 +283,13 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
           <button
             type="button"
             className="featured-order-grip"
-            aria-label={`Move ${product.name}. Position ${index + 1} of ${products.length}. Use arrow keys or drag.`}
+            aria-label={filtering
+              ? `Clear the featured search to drag ${product.name}`
+              : `Move ${product.name}. Position ${index + 1} of ${products.length}. Use arrow keys or drag.`}
             onPointerDown={(e) => startDrag(product.id, e)}
             onKeyDown={(e) => handleGripKeyDown(product.id, e)}
-            disabled={saving}
+            disabled={saving || filtering}
+            title={filtering ? 'Clear search to drag' : 'Drag to reorder'}
           >
             <Grip size={14} />
           </button>
@@ -264,11 +309,22 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
           <div className="featured-order-actions">
             <button
               type="button"
+              className="featured-order-top"
+              aria-label={`Move ${product.name} to the top of featured products`}
+              title="Move to top"
+              onClick={() => moveToTop(product.id)}
+              disabled={saving || index === 0}
+            >
+              <ArrowUpToLine size={13} />
+              Move to top
+            </button>
+            <button
+              type="button"
               className="featured-order-nudge"
               aria-label={`Move ${product.name} one position earlier`}
               title="Move earlier"
               onClick={() => moveBy(product.id, -1)}
-              disabled={saving || index === 0}
+              disabled={saving || filtering || index === 0}
             >
               <ArrowLeft size={13} />
             </button>
@@ -278,7 +334,7 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
               aria-label={`Move ${product.name} one position later`}
               title="Move later"
               onClick={() => moveBy(product.id, 1)}
-              disabled={saving || index === products.length - 1}
+              disabled={saving || filtering || index === products.length - 1}
             >
               <ArrowRight size={13} />
             </button>
@@ -294,7 +350,8 @@ function FeaturedOrderList({ products, onReorder, onRemove, saving }) {
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -304,6 +361,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
   const previewSimulation = typeof window !== 'undefined'
     && isReadOnlyPreviewHost(window.location.hostname);
   const [searchInput, setSearchInput] = useState('');
+  const [featuredSearch, setFeaturedSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [page, setPage] = useState(1);
@@ -505,7 +563,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
     return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
   }, [hasUnsavedChanges]);
 
-  const toggleFeatured = useCallback((sku, checked) => {
+  const toggleFeatured = useCallback((sku, checked, placement = 'end') => {
     if (!featuredListReady) return;
     const normalized = String(sku || '').trim().toUpperCase();
     if (!normalized) return;
@@ -515,10 +573,10 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
         onShowToast?.(`Maximum ${FEATURED_HARD_CAP} featured products`, 'error');
         return;
       }
-      updateDraftItems([
-        ...featuredItems,
-        { sku: normalized, addedAt: new Date().toISOString() },
-      ]);
+      const addedAt = new Date().toISOString();
+      updateDraftItems(placement === 'top'
+        ? addFeaturedItemToTop(featuredItems, normalized, addedAt)
+        : [...featuredItems, { sku: normalized, addedAt }]);
       return;
     }
     updateDraftItems(featuredItems.filter((item) => item.sku !== normalized));
@@ -631,13 +689,44 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
       <section className="featured-workspace-section" aria-labelledby="featured-current-heading">
           <h3 id="featured-current-heading" className="featured-workspace-heading">1. Current featured products</h3>
           <div className="featured-order-guide" role="note">
-            <Grip size={15} />
+            <ArrowUpToLine size={15} />
             <span>
               {previewSimulation
-                ? 'Try dragging, arrow keys or tile controls. Preview changes are temporary and never saved.'
-                : 'Drag any handle to set the live storefront sequence. Use arrow keys or the tile controls for precise moves.'}
+                ? 'Find a product, then use Move to top. Preview changes are temporary and never saved.'
+                : 'Find a product, then use Move to top. Arrow controls and dragging remain available when the search is clear.'}
             </span>
           </div>
+          <div className="featured-current-toolbar">
+            <label className="adm-search featured-current-search">
+              <Search size={15} />
+              <input
+                type="search"
+                className="adm-search-input"
+                placeholder="Find a featured product…"
+                value={featuredSearch}
+                onChange={(event) => setFeaturedSearch(event.target.value)}
+              />
+            </label>
+            {featuredSearch.trim() && (
+              <>
+                <span className="adm-muted featured-current-count" role="status">
+                  {filterFeaturedProducts(orderedFeaturedProducts, featuredSearch).length} found
+                </span>
+                <button
+                  type="button"
+                  className="adm-btn-ghost adm-btn--sm"
+                  onClick={() => setFeaturedSearch('')}
+                >
+                  <X size={14} /> Clear search
+                </button>
+              </>
+            )}
+          </div>
+          {featuredSearch.trim() && (
+            <p className="adm-section-note featured-filter-note">
+              Move to top stays available. Clear the search to drag or move one place at a time.
+            </p>
+          )}
           {featuredQuery.isLoading ? (
             <p className="adm-section-note"><Loader2 size={14} className="spin" /> Loading featured products…</p>
           ) : featuredQuery.isError ? (
@@ -664,6 +753,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
               )}
               <FeaturedOrderList
                 products={orderedFeaturedProducts}
+                searchQuery={featuredSearch}
                 onReorder={handleReorder}
                 onRemove={removeFeatured}
                 saving={saving || !featuredListReady}
@@ -676,7 +766,7 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
           <div className="featured-workspace-section-head">
             <div>
               <h3 id="featured-add-heading" className="featured-workspace-heading">2. Add more products</h3>
-              <p className="adm-section-note">Search the catalogue and add products. They appear at the end of the order above, ready to move.</p>
+              <p className="adm-section-note">Search the catalogue and choose Add to top. The product appears first immediately.</p>
             </div>
           </div>
           <div className="adm-toolbar pm-toolbar" style={{ marginBottom: 12 }}>
@@ -735,10 +825,10 @@ function FeaturedPanelInner({ taxonomyTree = [], onShowToast }) {
                         type="button"
                         className={`featured-pick-action${checked ? ' featured-pick-action--selected' : ''}`}
                         disabled={saving || !featuredListReady}
-                        onClick={() => toggleFeatured(product.sku, !checked)}
+                        onClick={() => toggleFeatured(product.sku, !checked, checked ? 'end' : 'top')}
                         aria-label={`${checked ? 'Remove' : 'Add'} ${product.name} ${checked ? 'from' : 'to'} featured products`}
                       >
-                        {checked ? <><Check size={13} /> Featured</> : <><Plus size={13} /> Add</>}
+                        {checked ? <><Check size={13} /> Featured</> : <><ArrowUpToLine size={13} /> Add to top</>}
                       </button>
                     </article>
                   );

@@ -5,6 +5,7 @@ import {
   excelImageArchiveSource,
   filterProductArchiveSection,
   isExcelImageArchiveSource,
+  isNewImageArchiveSource,
   isNewProductLoaderImageArchiveRow,
   prioritizeLatestExcelImageBatch,
   prioritizeRowsBySku,
@@ -90,22 +91,26 @@ describe('Archive ordering', () => {
     expect(api.indexOf('paginateRows(rows, page, pageSize)', prioritizeAt)).toBeGreaterThan(prioritizeAt);
   });
 
-  it('separates today\'s Product Loader image intakes from the older product archive in Johannesburg time', () => {
+  it('separates every image item archived today through the loader or Product Manager in Johannesburg time', () => {
     const now = new Date('2026-08-27T10:00:00.000Z');
     const rows = [
       { sku: 'NUT-NEW', archived_by: 'nutstore', archived_at: '2026-08-26T22:30:00.000Z' },
       { sku: 'EXCEL-NEW', archived_by: 'excel-images:batch-1', archived_at: '2026-08-27T08:00:00.000Z' },
       { sku: 'MANUAL-TODAY', archived_by: 'product-manager', archived_at: '2026-08-27T08:00:00.000Z' },
+      { sku: 'BULK-TODAY', archived_by: 'admin-bulk', archived_at: '2026-08-27T08:00:00.000Z' },
       { sku: 'NUT-OLD', archived_by: 'nutstore', archived_at: '2026-08-26T20:00:00.000Z' },
       { sku: 'LEGACY', archived_by: 'nutstore', archived_at: null },
     ];
 
+    expect(isNewImageArchiveSource('product-manager')).toBe(true);
+    expect(isNewImageArchiveSource('admin-bulk')).toBe(true);
+    expect(isNewImageArchiveSource('recycle-bin')).toBe(false);
     expect(isNewProductLoaderImageArchiveRow(rows[0], now)).toBe(true);
     expect(filterProductArchiveSection(rows, 'new-images', now).map((row) => row.sku))
-      .toEqual(['NUT-NEW', 'EXCEL-NEW']);
+      .toEqual(['NUT-NEW', 'EXCEL-NEW', 'MANUAL-TODAY', 'BULK-TODAY']);
     expect(filterProductArchiveSection(rows, 'older', now).map((row) => row.sku))
-      .toEqual(['MANUAL-TODAY', 'NUT-OLD', 'LEGACY']);
-    expect(rows).toHaveLength(5);
+      .toEqual(['NUT-OLD', 'LEGACY']);
+    expect(rows).toHaveLength(6);
   });
 
   it('puts the new image split in the main Archive and leaves Image Processing history flat', () => {

@@ -3095,6 +3095,39 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
   color: #8B1A1A;
 }
 
+.featured-current-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.featured-current-search {
+  flex: 1;
+  min-width: 220px;
+  max-width: 620px;
+}
+
+.featured-current-count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.featured-filter-note {
+  margin: -2px 0 10px;
+  color: #475569;
+}
+
+.featured-current-empty {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  text-align: center;
+}
+
 .featured-order-grid {
   --featured-grid-columns: 4;
   display: grid;
@@ -3181,6 +3214,7 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
 }
 
 .featured-order-grip:focus-visible,
+.featured-order-top:focus-visible,
 .featured-order-nudge:focus-visible,
 .featured-order-remove:focus-visible {
   outline: 3px solid rgba(212, 173, 86, 0.48);
@@ -3231,13 +3265,14 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
 .featured-order-actions {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 34px 34px 1fr;
+  grid-template-columns: minmax(96px, 1fr) 34px 34px 34px;
   gap: 6px;
   align-items: center;
   padding-top: 9px;
   border-top: 1px solid #eef0f2;
 }
 
+.featured-order-top,
 .featured-order-nudge,
 .featured-order-remove {
   min-width: 34px;
@@ -3252,11 +3287,21 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
   cursor: pointer;
 }
 
+.featured-order-top {
+  gap: 5px;
+  padding: 0 9px;
+  color: #1f2937;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .featured-order-remove {
   justify-self: end;
   color: #991b1b;
 }
 
+.featured-order-top:hover:not(:disabled),
 .featured-order-nudge:hover:not(:disabled) {
   border-color: #9ca3af;
   background: #f8fafc;
@@ -3267,6 +3312,7 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
   background: #fef2f2;
 }
 
+.featured-order-top:disabled,
 .featured-order-nudge:disabled,
 .featured-order-remove:disabled {
   opacity: 0.35;
@@ -3344,7 +3390,7 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
   justify-content: center;
   gap: 4px;
   flex-shrink: 0;
-  min-width: 76px;
+  min-width: 92px;
   min-height: 32px;
   padding: 6px 9px;
   border: 1px solid #d1d5db;
@@ -3390,6 +3436,21 @@ body.adm-is-reorder-dragging .adm-reorder-card--dragging {
   .featured-workspace-toolbar button {
     flex: 1;
     justify-content: center;
+  }
+
+  .featured-current-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .featured-current-search {
+    flex-basis: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .featured-current-toolbar button {
+    margin-left: auto;
   }
 
   .featured-pick-card {
