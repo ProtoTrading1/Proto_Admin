@@ -5,4 +5,5 @@ export {
   deriveAutoNotesFromItems,
   buildOrderNoteSections,
   customerDetailRows,
+  customerEmailIdentity,
 } from '../lib/order-format.mjs';

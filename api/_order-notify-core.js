@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PROTO_URLS } from './_proto-urls.js';
 import { resolveOrderAlertRecipients } from './_order-alert-recipients.js';
 import { sendBrevoTransactional } from './_brevo-email.js';
+import { customerEmailIdentity } from './_order-format.js';
 import {
   getPortalAdminClient,
   readOrderNotifyLog,
@@ -76,6 +77,12 @@ async function loadStoredOrderPdf(orderId) {
 
 async function sendNewOrderAlertEmail(order, { resendCount = 0 } = {}) {
   const customer = order.customers || {};
+  const { customerName, companyName } = customerEmailIdentity(customer);
+  const customerLabel = customerName || companyName || 'Unknown customer';
+  const companyLine = companyName
+    ? `<br/><strong>Company:</strong> ${esc(companyName)}`
+    : '';
+  const subjectIdentity = [customerName, companyName].filter(Boolean).join(' - ') || 'Unknown';
   const orderNo = order.order_number || order.id;
   const amount = formatRand(orderAmountExVat(order));
   const placedAt = order.created_at
@@ -109,8 +116,8 @@ async function sendNewOrderAlertEmail(order, { resendCount = 0 } = {}) {
   const htmlContent = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;margin:0 auto;padding:24px;">
   <h2 style="margin:0 0 8px;">${resendCount > 0 ? 'Resent order' : 'New order'} ${esc(orderNo)}</h2>
   <p style="margin:0 0 16px;color:#374151;">
-    <strong>${esc(customer.name || customer.business_name || 'Unknown customer')}</strong>
-    ${customer.email ? ` · ${esc(customer.email)}` : ''}<br/>
+    <strong>Customer:</strong> ${esc(customerLabel)}${companyLine}
+    ${customer.email ? `<br/><strong>Email:</strong> ${esc(customer.email)}` : ''}<br/>
     ${placedAt ? `Placed ${esc(placedAt)} · ` : ''}Total <strong>${esc(amount)}</strong> ex VAT
   </p>
   <p style="font-size:13px;color:#374151;"><strong>${items.length}</strong> product line${items.length === 1 ? '' : 's'} · ${pdf ? 'complete order PDF attached.' : 'every line is listed below.'}</p>
@@ -123,9 +130,9 @@ async function sendNewOrderAlertEmail(order, { resendCount = 0 } = {}) {
 
   const response = await sendBrevoTransactional({
     to: NEW_ORDER_ALERT_EMAILS.map((email) => ({ email, name: 'Proto Trading Orders' })),
-    subject: `New order ${orderNo} — ${customer.name || customer.business_name || 'Unknown'} — ${amount}`,
+    subject: `New order ${orderNo} — ${subjectIdentity} — ${amount}`,
     htmlContent,
-    textContent: `New order ${orderNo} from ${customer.name || 'Unknown'} — total ${amount} ex VAT.`,
+    textContent: `New order ${orderNo}\nCustomer: ${customerLabel}${companyName ? `\nCompany: ${companyName}` : ''}${customer.email ? `\nEmail: ${customer.email}` : ''}\nTotal: ${amount} ex VAT.`,
     attachment: pdf ? [{
       name: `proto-order-${orderNo}.pdf`,
       content: pdf.toString('base64'),

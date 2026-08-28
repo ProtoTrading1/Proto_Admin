@@ -1344,7 +1344,8 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
         body: JSON.stringify({
           orderId: order.id,
           to: email,
-          customerName: order.customers?.name,
+          customerName: order.customers?.contact_name || order.customers?.name,
+          companyName: order.customers?.business_name,
           orderNumber: displayOrderNumber(order),
           orderDate: order.created_at,
           items: customerItems,
