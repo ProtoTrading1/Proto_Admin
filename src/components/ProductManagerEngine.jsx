@@ -1634,8 +1634,8 @@ export default function ProductManagerEngine({
                     {archiveStockView === 'negative'
                       ? 'Live products with negative ERP stock. Zero-stock items are not shown here.'
                       : archiveSection === 'new-images'
-                        ? 'New products Catherine sent to Archive from an image intake today. Nothing in this view is live until Make live is confirmed.'
-                        : 'Previously archived products. New image intakes from today are kept in the separate New image items view.'}
+                        ? 'Products sent to Archive from Product Loader. They stay here until Make live is confirmed.'
+                        : 'Previously archived products. Product Loader image items are kept in the separate New image items view.'}
                   </p>
                   <div className="pm-archive-stock-toggle" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: '100%', marginBottom: 8 }}>
                     <button
@@ -1908,7 +1908,7 @@ export default function ProductManagerEngine({
                           ? 'No live products with negative stock.'
                           : status === 'archived'
                             ? archiveSection === 'new-images'
-                              ? 'No new image items have been sent to Archive today.'
+                              ? 'No Product Loader image items are waiting in Archive.'
                               : 'No older archived products (zero-stock items are hidden).'
                             : 'No products in this view.'}
                       </p>
@@ -2101,7 +2101,7 @@ export default function ProductManagerEngine({
                         ? 'No live products with negative stock.'
                         : status === 'archived'
                           ? archiveSection === 'new-images'
-                            ? 'No new image items have been sent to Archive today.'
+                            ? 'No Product Loader image items are waiting in Archive.'
                             : 'No older archived products (zero-stock items are hidden).'
                           : 'No products in this view.'}
                     </p>
