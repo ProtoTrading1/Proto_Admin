@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for Proto Codex analytics jobs every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+RandomizedDelaySec=10s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

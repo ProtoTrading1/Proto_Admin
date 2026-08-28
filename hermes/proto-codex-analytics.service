@@ -1,0 +1,28 @@
+[Unit]
+Description=Proto read-only Codex analytics worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=proto-analytics
+Group=proto-analytics
+Environment=HOME=/home/proto-analytics
+EnvironmentFile=/etc/proto-codex-analytics.env
+WorkingDirectory=/var/lib/proto-analytics
+ExecStart=/usr/bin/node /opt/proto-analytics/worker/codex-analytics-worker.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+UMask=0077
+ReadWritePaths=/var/lib/proto-analytics /tmp

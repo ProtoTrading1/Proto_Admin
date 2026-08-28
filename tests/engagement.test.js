@@ -24,6 +24,13 @@ const visit = (over = {}) => ({
 });
 
 describe('visitSeconds', () => {
+  it('prefers measured active seconds over wall-clock tab lifetime', () => {
+    expect(visitSeconds({
+      active_seconds: 95,
+      started_at: '2026-08-20T08:00:00Z',
+      last_seen_at: '2026-08-28T08:00:00Z',
+    })).toBe(95);
+  });
   it('measures the gap between the first and last beat', () => {
     expect(visitSeconds(visit())).toBe(300);
   });

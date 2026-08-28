@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     const [visits, cartEvents, campaigns] = await Promise.all([
       fetchAll(() => supabase
         .from('customer_visits')
-        .select('customer_id, session_id, started_at, last_seen_at')
+        .select('*')
         .gte('started_at', sinceIso)
         .order('started_at', { ascending: false })),
       fetchAll(() => supabase
