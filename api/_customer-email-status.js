@@ -58,3 +58,27 @@ export async function markCustomersEmailed(supabase, emails, type, at = null) {
   }
   return { ok: true, updated };
 }
+
+/**
+ * Stamp CRM contacts as well as portal customers. Group members and imported
+ * leads intentionally do not have rows in `customers`, so updating only that
+ * table makes successful broadcasts invisible in Email CRM.
+ */
+export async function markCrmContactsEmailed(supabase, emails, campaignName, at = null) {
+  const list = [...new Set((emails || []).map((e) => String(e || '').trim().toLowerCase()).filter(Boolean))];
+  if (!supabase || !campaignName || !list.length) return { ok: false, updated: 0 };
+  const stamp = at || new Date().toISOString();
+  let updated = 0;
+  const CHUNK = 200;
+  for (let i = 0; i < list.length; i += CHUNK) {
+    const slice = list.slice(i, i + CHUNK);
+    try {
+      const { error } = await supabase
+        .from('crm_contacts')
+        .update({ last_campaign_name: String(campaignName).trim(), last_sent_at: stamp })
+        .in('email', slice);
+      if (!error) updated += slice.length;
+    } catch { /* analytics must never break a successful send */ }
+  }
+  return { ok: true, updated };
+}
