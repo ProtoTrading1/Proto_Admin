@@ -8,7 +8,7 @@ const { checkRateLimitMock, createClientMock } = vi.hoisted(() => ({
 vi.mock('../api/_rate-limit.js', () => ({ checkRateLimit: checkRateLimitMock }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: createClientMock }));
 
-import handler, { READ_ONLY_PREVIEW_MESSAGE, buildServerSnapshot, isProductionAnalyticsRuntime } from '../api/codex-analytics-jobs.js';
+import handler, { READ_ONLY_PREVIEW_MESSAGE, buildServerSnapshot, isAnalyticsWriteRuntime, isProductionAnalyticsRuntime } from '../api/codex-analytics-jobs.js';
 
 function source(payload, assertions = () => {}) {
   return async (req, res) => {
@@ -49,6 +49,21 @@ describe('server-authoritative Codex analytics jobs', () => {
     expect(isProductionAnalyticsRuntime({ VERCEL_ENV: 'preview' })).toBe(false);
     expect(isProductionAnalyticsRuntime({ VERCEL_ENV: 'development' })).toBe(false);
     expect(isProductionAnalyticsRuntime({})).toBe(false);
+    expect(isAnalyticsWriteRuntime({ VERCEL_ENV: 'preview' })).toBe(false);
+    expect(isAnalyticsWriteRuntime({
+      VERCEL_ENV: 'preview',
+      ANALYTICS_PREVIEW_WRITES_ENABLED: 'true',
+      ANALYTICS_PREVIEW_PROJECT_REF: 'xicygaamdogfdpzyrlcp',
+      ANALYTICS_PREVIEW_GATEWAY_URL: 'https://xicygaamdogfdpzyrlcp.supabase.co/functions/v1/proto-analytics-preview-gateway',
+      ANALYTICS_PREVIEW_GATEWAY_SECRET: 'temporary-test-secret',
+    })).toBe(true);
+    expect(isAnalyticsWriteRuntime({
+      VERCEL_ENV: 'preview',
+      ANALYTICS_PREVIEW_WRITES_ENABLED: 'true',
+      ANALYTICS_PREVIEW_PROJECT_REF: 'kyodrsqnmihwoplkhwwf',
+      ANALYTICS_PREVIEW_GATEWAY_URL: 'https://kyodrsqnmihwoplkhwwf.supabase.co/functions/v1/proto-analytics-preview-gateway',
+      ANALYTICS_PREVIEW_GATEWAY_SECRET: 'temporary-test-secret',
+    })).toBe(false);
   });
 
   it('builds the model snapshot from authenticated server reads', async () => {

@@ -7,6 +7,7 @@ import customerAttentionHandler from './customer-attention.js';
 import orderAnalyticsHandler from './order-analytics.js';
 import searchAnalyticsHandler from './search-analytics-dashboard.js';
 import abandonedBasketsHandler from './abandoned-baskets.js';
+import { callPreviewAnalyticsGateway, previewAnalyticsGatewayEnabled } from './_analytics-preview-gateway.js';
 
 export const config = { maxDuration: 60 };
 
@@ -14,6 +15,10 @@ export const READ_ONLY_PREVIEW_MESSAGE = 'This preview is read-only. Nothing was
 
 export function isProductionAnalyticsRuntime(env = process.env) {
   return String(env.VERCEL_ENV || '').trim().toLowerCase() === 'production';
+}
+
+export function isAnalyticsWriteRuntime(env = process.env) {
+  return isProductionAnalyticsRuntime(env) || previewAnalyticsGatewayEnabled(env);
 }
 
 function db() {
@@ -69,11 +74,10 @@ export async function buildServerSnapshot(req, periodDays, handlers = {}) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
-  if (req.method === 'POST' && !isProductionAnalyticsRuntime()) {
+  if (req.method === 'POST' && !isAnalyticsWriteRuntime()) {
     return res.status(409).json({ error: READ_ONLY_PREVIEW_MESSAGE });
   }
   if (!(await requireAdminKey(req, res))) return;
-  const supabase = db();
   const admin = await verifyAdminUser(req);
   const requester = admin?.id ? `admin-user:${admin.id}` : 'admin-service';
 
@@ -81,18 +85,27 @@ export default async function handler(req, res) {
     const limit = await checkRateLimit({ bucket: `codex-analytics:${requester}`, max: 10, windowSeconds: 3600 });
     if (!limit.allowed) return res.status(429).json({ error: 'Codex analysis limit reached. Try again later.' });
     const periodDays = [7, 30, 90].includes(Number(req.body?.periodDays)) ? Number(req.body.periodDays) : 30;
-    const { snapshot, referenceMap } = prepareCodexSnapshot(await buildServerSnapshot(req, periodDays));
+    const sourceSnapshot = previewAnalyticsGatewayEnabled()
+      ? await callPreviewAnalyticsGateway('snapshot', { periodDays })
+      : await buildServerSnapshot(req, periodDays);
+    const { snapshot, referenceMap } = prepareCodexSnapshot(sourceSnapshot);
     const snapshotHash = createHash('sha256')
       .update(JSON.stringify({ snapshot, referenceMap }))
       .digest('hex');
-    const { data, error } = await supabase.rpc('enqueue_codex_analytics_job', {
-      p_snapshot: snapshot,
-      p_reference_map: referenceMap,
-      p_snapshot_hash: snapshotHash,
-      p_requested_by: requester,
-    });
-    if (error) return res.status(400).json({ error: error.message });
-    const job = data?.[0];
+    let job;
+    if (previewAnalyticsGatewayEnabled()) {
+      job = (await callPreviewAnalyticsGateway('enqueue', { snapshot, referenceMap, snapshotHash, requester })).job;
+    } else {
+      const supabase = db();
+      const { data, error } = await supabase.rpc('enqueue_codex_analytics_job', {
+        p_snapshot: snapshot,
+        p_reference_map: referenceMap,
+        p_snapshot_hash: snapshotHash,
+        p_requested_by: requester,
+      });
+      if (error) return res.status(400).json({ error: error.message });
+      job = data?.[0];
+    }
     if (!job) return res.status(503).json({ error: 'Codex analytics queue is unavailable.' });
     return res.status(job.status === 'completed' ? 200 : 202).json({ id: job.id, status: job.status, requested_at: job.requested_at });
   }
@@ -100,8 +113,15 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const id = String(req.query.id || '').trim();
     if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'A valid job id is required.' });
-    const { data, error } = await supabase.from('codex_analytics_jobs').select('id, status, result, reference_map, error, requested_at, started_at, completed_at').eq('id', id).maybeSingle();
-    if (error) return res.status(400).json({ error: error.message });
+    let data;
+    if (previewAnalyticsGatewayEnabled()) {
+      data = (await callPreviewAnalyticsGateway('status', { jobId: id })).job;
+    } else {
+      const supabase = db();
+      const result = await supabase.from('codex_analytics_jobs').select('id, status, result, reference_map, error, requested_at, started_at, completed_at').eq('id', id).maybeSingle();
+      if (result.error) return res.status(400).json({ error: result.error.message });
+      data = result.data;
+    }
     if (!data) return res.status(404).json({ error: 'Analytics job not found.' });
     const { reference_map: referenceMap, ...job } = data;
     if (job.result) job.result = applyCodexReferenceMap(job.result, referenceMap);

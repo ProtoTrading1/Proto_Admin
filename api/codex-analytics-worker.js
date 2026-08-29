@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeCodexReport } from '../lib/analytics-insights.mjs';
+import { callPreviewAnalyticsGateway, previewAnalyticsGatewayEnabled } from './_analytics-preview-gateway.js';
 
 function safeEqual(a, b) {
   const one = Buffer.from(String(a || ''));
@@ -18,6 +19,27 @@ export default async function handler(req, res) {
   if (!safeEqual(req.headers['x-codex-worker-secret'], process.env.CODEX_ANALYTICS_WORKER_SECRET)) return res.status(401).json({ error: 'Worker authentication required' });
   const supabase = db();
   const action = String(req.body?.action || '');
+
+  if (previewAnalyticsGatewayEnabled()) {
+    try {
+      if (action === 'claim') {
+        return res.status(200).json(await callPreviewAnalyticsGateway('claim', { workerId: String(req.body?.workerId || 'hermes').slice(0, 100) }));
+      }
+      const result = action === 'complete' ? normalizeCodexReport(req.body?.result || {}) : undefined;
+      if (action === 'complete' && !result.summary) return res.status(400).json({ error: 'Report summary is required' });
+      const payload = await callPreviewAnalyticsGateway(action, {
+        jobId: req.body?.jobId,
+        claimToken: req.body?.claimToken,
+        workerId: String(req.body?.workerId || '').slice(0, 100),
+        result,
+        usage: req.body?.usage || {},
+        error: req.body?.error,
+      });
+      return res.status(200).json(payload);
+    } catch (error) {
+      return res.status(502).json({ error: error.message });
+    }
+  }
 
   if (action === 'claim') {
     const maintenance = await supabase.rpc('run_codex_analytics_maintenance');
