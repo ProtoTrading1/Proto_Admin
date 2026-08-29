@@ -28,7 +28,7 @@ export default function BuyingPanel({ onOpenProductIntelligence }) {
     <section className="adm-panel intelligence-panel" aria-labelledby="buying-title">
       <div className="adm-section-head intelligence-panel__head">
         <div>
-          <div className="intelligence-eyebrow"><Sparkles size={15} /> Hermes</div>
+          <div className="intelligence-eyebrow"><Sparkles size={15} /> Apollo</div>
           <h2 id="buying-title" className="adm-section-title">Buying</h2>
           <p className="adm-section-note">The new server-backed home for supplier-order review and buying decisions.</p>
         </div>

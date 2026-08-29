@@ -137,7 +137,7 @@ describe('product intelligence — read-only combined contract', () => {
     }
   });
 
-  it('keeps the Hermes foundation grid content-sized', () => {
+  it('keeps the Apollo foundation grid content-sized', () => {
     const css = readFileSync('src/index.css', 'utf8');
     expect(css).toMatch(/\.intelligence-panel\s*\{[^}]*align-content:\s*start/);
     expect(css).toMatch(/\.intelligence-callout\s*\{[^}]*justify-content:\s*flex-start/);

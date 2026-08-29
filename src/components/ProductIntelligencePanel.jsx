@@ -171,7 +171,7 @@ export default function ProductIntelligencePanel() {
     <section className="adm-panel intelligence-panel" aria-labelledby="product-intelligence-title">
       <div className="adm-section-head intelligence-panel__head">
         <div>
-          <div className="intelligence-eyebrow"><PackageSearch size={15} /> Hermes</div>
+          <div className="intelligence-eyebrow"><PackageSearch size={15} /> Apollo</div>
           <h2 id="product-intelligence-title" className="adm-section-title">Product Intelligence</h2>
           <p className="adm-section-note">One read-only view of the available Positill and website information, joined by the canonical Positill CODE.</p>
         </div>

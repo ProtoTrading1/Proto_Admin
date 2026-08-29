@@ -129,7 +129,7 @@ export default function BackendAnalyticsAnalyst() {
 
       <section className="oa-panel">
         <div className="oa-panel-head"><div><h3><Bot size={16} /> Backend Analyst</h3><p className="oa-note">Combines orders, searches, outstanding baskets and active product/category viewing into one practical review.</p></div></div>
-        <p className="oa-note"><ShieldCheck size={14} /> Codex CLI runs on Hermes in read-only mode. It cannot change products, prices, orders, customers or the live website. Customer names and contact details are excluded.</p>
+        <p className="oa-note"><ShieldCheck size={14} /> Codex CLI runs through Apollo in read-only mode. It cannot change products, prices, orders, customers or the live website. Customer names and contact details are excluded.</p>
       </section>
 
       {error && <div className="oa-error">{error}</div>}

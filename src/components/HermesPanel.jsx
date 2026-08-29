@@ -23,7 +23,7 @@ export default function HermesPanel({ onSelectSection }) {
       <div className="adm-section-head intelligence-panel__head">
         <div>
           <div className="intelligence-eyebrow"><Bot size={15} /> Proto Intelligence</div>
-          <h2 id="hermes-title" className="adm-section-title">Hermes</h2>
+          <h2 id="hermes-title" className="adm-section-title">Apollo</h2>
           <p className="adm-section-note">
             A read-only foundation for joined Positill, website and buying intelligence inside the existing admin login.
           </p>
