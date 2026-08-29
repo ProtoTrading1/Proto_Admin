@@ -12,6 +12,11 @@ describe('email campaign follow-up audiences', () => {
     expect(batch).toMatch(/const failedEmails = \[\];/);
   });
 
+  it('stamps CRM contacts for group broadcasts using only successful recipients', () => {
+    expect(broadcast).toContain("markCrmContactsEmailed(sb, successfulRecipientEmails, subject, sentAt)");
+    expect(broadcast).toContain("import { markCustomersEmailed, markCrmContactsEmailed }");
+  });
+
   it('provides the five recipient tabs and keeps bounced contacts out of follow-up', () => {
     expect(analytics).toContain("label: 'All recipients'");
     expect(analytics).toContain("label: 'No recorded open'");
