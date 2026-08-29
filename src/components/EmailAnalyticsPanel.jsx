@@ -47,23 +47,18 @@ function downloadCsv(filename, rows) {
 }
 
 function recipientStatusRows(campaign) {
-  const snapshot = uniqueEmails(campaign.recipientEmails);
-  const opened = new Set(uniqueEmails(campaign.eventEmails?.opened));
-  const clicked = new Set(uniqueEmails(campaign.eventEmails?.clicked));
-  const bounced = new Set(uniqueEmails(campaign.eventEmails?.bounced));
-  const unsubscribed = new Set(uniqueEmails(campaign.eventEmails?.unsubscribed));
-  const complained = new Set(uniqueEmails(campaign.eventEmails?.complained));
-  const known = uniqueEmails([...opened, ...clicked, ...bounced, ...unsubscribed, ...complained]);
-  const emails = snapshot.length ? snapshot : known;
-  return emails.map((email) => {
-    let status = 'Sent — no event recorded';
-    if (complained.has(email)) status = 'Spam complaint';
-    else if (unsubscribed.has(email)) status = 'Unsubscribed';
-    else if (bounced.has(email)) status = 'Bounced';
-    else if (clicked.has(email)) status = 'Clicked';
-    else if (opened.has(email)) status = 'Opened — no click';
-    return [email, status];
-  });
+  const data = campaignRecipientData(campaign);
+  return data.emails.map((email) => [
+    email,
+    data.status.get(email),
+    data.failed.has(email) ? 'No' : 'Yes',
+    data.delivered.has(email) ? 'Yes' : 'No',
+    data.opened.has(email) ? 'Yes' : 'No',
+    data.clicked.has(email) ? 'Yes' : 'No',
+    data.bounced.has(email) ? 'Yes' : 'No',
+    data.unsubscribed.has(email) ? 'Yes' : 'No',
+    data.complained.has(email) ? 'Yes' : 'No',
+  ]);
 }
 
 const SORTS = {
@@ -331,20 +326,38 @@ function uniqueEmails(values) {
     .filter(Boolean))];
 }
 
+function campaignRecipientData(campaign) {
+  const snapshot = uniqueEmails(campaign.recipientEmails);
+  const opened = new Set(uniqueEmails(campaign.eventEmails?.opened));
+  const clicked = new Set(uniqueEmails(campaign.eventEmails?.clicked));
+  const bounced = new Set(uniqueEmails(campaign.eventEmails?.bounced));
+  const unsubscribed = new Set(uniqueEmails(campaign.eventEmails?.unsubscribed));
+  const complained = new Set(uniqueEmails(campaign.eventEmails?.complained));
+  const failed = new Set(uniqueEmails(campaign.failedRecipientEmails));
+  const known = uniqueEmails([...opened, ...clicked, ...bounced, ...unsubscribed, ...complained, ...failed]);
+  const emails = snapshot.length ? snapshot : known;
+  const accepted = new Set(emails.filter((email) => !failed.has(email)));
+  const delivered = new Set([...accepted].filter((email) => !bounced.has(email)));
+  const status = new Map(emails.map((email) => {
+    let value = 'Delivered — estimated';
+    if (complained.has(email)) value = 'Spam complaint';
+    else if (unsubscribed.has(email)) value = 'Unsubscribed';
+    else if (bounced.has(email)) value = 'Bounced';
+    else if (failed.has(email)) value = 'Not sent — failed';
+    else if (clicked.has(email)) value = 'Clicked';
+    else if (opened.has(email)) value = 'Opened — no click';
+    return [email, value];
+  }));
+  return { emails, opened, clicked, bounced, unsubscribed, complained, failed, accepted, delivered, status };
+}
+
 function CampaignDetail({ campaign, onClose, onCompose }) {
+  const data = campaignRecipientData(campaign);
   const snapshotEmails = uniqueEmails(campaign.recipientEmails);
-  const opened = uniqueEmails(campaign.eventEmails?.opened);
-  const clicked = uniqueEmails(campaign.eventEmails?.clicked);
-  const excluded = uniqueEmails([
-    ...(campaign.eventEmails?.bounced || []),
-    ...(campaign.eventEmails?.unsubscribed || []),
-    ...(campaign.eventEmails?.complained || []),
-  ]);
-  const activeEmails = new Set([...opened, ...clicked, ...excluded]);
-  const noRecordedOpen = snapshotEmails.filter((email) => !activeEmails.has(email));
-  const openedNoClick = opened.filter((email) => !clicked.includes(email) && !excluded.includes(email));
-  const legacyKnownEmails = uniqueEmails([...opened, ...clicked, ...excluded]);
   const hasRecipientSnapshot = snapshotEmails.length > 0;
+  const noRecordedOpen = data.emails.filter((email) => data.accepted.has(email) && !data.opened.has(email));
+  const openedNoClick = data.emails.filter((email) => data.opened.has(email) && !data.clicked.has(email));
+  const legacyKnownEmails = data.emails;
   const groups = [
     {
       key: 'all',
@@ -352,6 +365,9 @@ function CampaignDetail({ campaign, onClose, onCompose }) {
       emails: hasRecipientSnapshot ? snapshotEmails : legacyKnownEmails,
       note: hasRecipientSnapshot ? '' : 'Legacy campaign: the original recipient snapshot was not saved. Showing tracked addresses only.',
     },
+    { key: 'failed', label: 'Not sent / failed', emails: data.emails.filter((email) => data.failed.has(email)), note: 'The send endpoint could not get this message accepted by Brevo.' },
+    { key: 'accepted', label: 'Accepted', emails: [...data.accepted], note: 'Brevo accepted these messages for processing.' },
+    { key: 'delivered', label: 'Delivered (estimate)', emails: [...data.delivered], note: 'Estimated as accepted messages less recorded bounces; not provider-confirmed delivery.' },
     {
       key: 'no-open',
       label: 'No recorded open',
@@ -362,17 +378,21 @@ function CampaignDetail({ campaign, onClose, onCompose }) {
         : 'Available for campaigns sent after this follow-up feature was added.',
     },
     { key: 'opened-no-click', label: 'Opened, no click', emails: openedNoClick, note: 'Opened at least once, but no tracked link click.' },
-    { key: 'clicked', label: 'Clicked', emails: clicked, note: 'Clicked at least one tracked link.' },
-    { key: 'excluded', label: 'Bounced / excluded', emails: excluded, note: 'Bounced, unsubscribed, or complained contacts. Do not resend from this list.' },
+    { key: 'clicked', label: 'Clicked', emails: [...data.clicked], note: 'Clicked at least one tracked link.' },
+    { key: 'bounced', label: 'Bounced', emails: [...data.bounced], note: 'Brevo recorded a bounce for these addresses.' },
+    { key: 'unsubscribed', label: 'Unsubscribed', emails: [...data.unsubscribed], note: 'These contacts opted out of marketing email.' },
+    { key: 'complained', label: 'Spam complaints', emails: [...data.complained], note: 'These contacts reported the message as spam.' },
   ];
   const links = Object.entries(campaign.clickedLinks || {});
   const [tab, setTab] = useState('all');
   const active = groups.find((g) => g.key === tab);
 
-  const exportRecipients = () => {
-    downloadCsv(`campaign-${(campaign.subject || 'email').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.csv`, [
-      ['Email', 'Status'],
-      ...recipientStatusRows(campaign),
+  const fileStem = `campaign-${(campaign.subject || 'email').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+  const exportRecipients = (group) => {
+    const allowed = group ? new Set(group.emails) : null;
+    downloadCsv(`${fileStem}-${group ? group.key : 'all-statuses'}.csv`, [
+      ['Email', 'Status', 'Send accepted', 'Delivery estimate', 'Opened', 'Clicked', 'Bounced', 'Unsubscribed', 'Spam complaint'],
+      ...recipientStatusRows(campaign).filter((row) => !allowed || allowed.has(row[0])),
     ]);
   };
 
@@ -445,9 +465,16 @@ function CampaignDetail({ campaign, onClose, onCompose }) {
               Create follow-up email ({active.emails.length})
             </button>
           )}
-          <button type="button" className="adm-btn-ghost" onClick={exportRecipients} disabled={!groups.length}>
-            <Download size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Export recipients
-          </button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button type="button" className="adm-btn-ghost" onClick={() => exportRecipients()} disabled={!data.emails.length}>
+              <Download size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Export all statuses
+            </button>
+            {active && tab !== 'links' && (
+              <button type="button" className="adm-btn-ghost" onClick={() => exportRecipients(active)} disabled={!active.emails.length}>
+                <Download size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Export {active.label}
+              </button>
+            )}
+          </div>
           <button type="button" className="adm-btn-red" onClick={onClose}>Close</button>
         </div>
       </div>

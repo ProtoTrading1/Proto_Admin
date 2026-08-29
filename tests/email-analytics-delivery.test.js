@@ -38,4 +38,12 @@ describe('email campaign delivery analytics', () => {
     expect(source).toContain('...recipientStatusRows(campaign)');
     expect(source).not.toContain('...groups.flatMap((g) => g.emails.map((e) => [e, g.label]))');
   });
+
+  it('exports separate per-campaign status files with delivery fields', () => {
+    expect(source).toContain('Export all statuses');
+    expect(source).toContain('Export {active.label}');
+    expect(source).toContain("'Delivery estimate'");
+    expect(source).toContain("label: 'Not sent / failed'");
+    expect(source).toContain("label: 'Delivered (estimate)'");
+  });
 });
