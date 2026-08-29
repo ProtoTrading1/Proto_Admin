@@ -8,6 +8,8 @@ const batch = fs.readFileSync(new URL('../api/_brevo-email.js', import.meta.url)
 describe('email campaign follow-up audiences', () => {
   it('saves successful recipient snapshots for future no-open follow-up lists', () => {
     expect(broadcast).toMatch(/recipientEmails:/);
+    expect(broadcast).toContain('const attemptedRecipientEmails = recipients');
+    expect(broadcast).toContain('failedRecipientEmails: [...failedRecipientEmails]');
     expect(broadcast).toMatch(/const failedRecipientEmails = new Set\(\(failedEmails \|\| \[\]\)\.filter\(Boolean\)\)/);
     expect(batch).toMatch(/const failedEmails = \[\];/);
   });

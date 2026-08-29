@@ -46,9 +46,11 @@ export async function runEmailBroadcast({ audience, subject, introText = '', htm
     htmlBlock,
   });
   const failedRecipientEmails = new Set((failedEmails || []).filter(Boolean));
-  const successfulRecipientEmails = recipients
+  const attemptedRecipientEmails = recipients
     .map((recipient) => String(recipient.email || '').trim().toLowerCase())
-    .filter((email) => email && !failedRecipientEmails.has(email));
+    .filter(Boolean);
+  const successfulRecipientEmails = attemptedRecipientEmails
+    .filter((email) => !failedRecipientEmails.has(email));
   const sentAt = new Date().toISOString();
 
   try {
@@ -60,10 +62,11 @@ export async function runEmailBroadcast({ audience, subject, introText = '', htm
       recipientCount: recipients.length,
       sent,
       failed,
-      // Snapshot successful recipients so the analytics screen can form a
-      // trustworthy "no recorded open" follow-up audience later. Event lists
-      // alone cannot tell us who did not open an older campaign.
-      recipientEmails: successfulRecipientEmails,
+      // Snapshot every attempted recipient so analytics can distinguish
+      // failed sends from accepted, delivered, opened, and clicked mail.
+      // Event lists alone cannot tell us who did not open a campaign.
+      recipientEmails: attemptedRecipientEmails,
+      failedRecipientEmails: [...failedRecipientEmails],
       messageIds: messageIds || [],
       events: {},
     });
