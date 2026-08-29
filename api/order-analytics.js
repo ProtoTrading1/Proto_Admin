@@ -12,7 +12,7 @@ const STATUS_LABELS = {
   'payment received': 'Payment Received',
 };
 
-const VALID_PERIODS = [7, 30, 90, 120];
+const VALID_PERIODS = [1, 7, 30, 90, 120];
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function getAdminClient() {
@@ -80,6 +80,13 @@ function parsePeriod(raw) {
   return VALID_PERIODS.includes(n) ? n : 30;
 }
 
+function johannesburgTodayStart() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date()).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00+02:00`);
+}
+
 function inPeriod(dateStr, cutoff) {
   const t = new Date(dateStr).getTime();
   return !Number.isNaN(t) && t >= cutoff.getTime();
@@ -137,8 +144,9 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') return res.status(405).end();
 
-  const periodDays = parsePeriod(req.query.period);
-  const cutoff = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
+  const exactToday = String(req.query.period || '').toLowerCase() === 'today';
+  const periodDays = exactToday ? 1 : parsePeriod(req.query.period);
+  const cutoff = exactToday ? johannesburgTodayStart() : new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
   const supabase = getAdminClient();
   const categoryLabels = loadCategoryLabels();
 

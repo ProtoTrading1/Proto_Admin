@@ -88,6 +88,8 @@ describe('read-only backend analytics insights', () => {
     expect(worker).toContain("'--strict-config'");
     expect(worker).toContain("'features.shell_tool=false'");
     expect(worker).toContain("'features.unified_exec=false'");
+    expect(worker).toContain("You are Apollo, George’s read-only eyes and ears for Proto Trading.");
+    expect(worker).toContain('customer_attention');
     const jobs = fs.readFileSync(new URL('../api/codex-analytics-jobs.js', import.meta.url), 'utf8');
     expect(jobs).toContain('buildServerSnapshot');
     expect(jobs).toContain('JSON.stringify({ snapshot, referenceMap })');

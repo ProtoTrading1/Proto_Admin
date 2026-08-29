@@ -1,7 +1,7 @@
 import { requireAdminKey } from './_admin-auth.js';
 import { createClient } from '@supabase/supabase-js';
 
-const VALID_PERIODS = [7, 30, 90, 0];
+const VALID_PERIODS = [1, 7, 30, 90, 0];
 const TOP_N = 10;
 
 function getAdminClient() {
@@ -17,7 +17,15 @@ function parsePeriod(raw) {
   return VALID_PERIODS.includes(n) ? n : 30;
 }
 
-function startDateFromPeriod(periodDays) {
+function johannesburgTodayStartIso() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date()).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00+02:00`).toISOString();
+}
+
+function startDateFromPeriod(periodDays, exactToday = false) {
+  if (exactToday) return johannesburgTodayStartIso();
   if (!periodDays) return null;
   const d = new Date();
   d.setDate(d.getDate() - periodDays);
@@ -155,8 +163,9 @@ export default async function handler(req, res) {
       return res.status(503).json({ error: 'Supabase env not configured on this deployment' });
     }
 
-    const period = parsePeriod(req.query?.period);
-    const startDate = startDateFromPeriod(period);
+    const exactToday = String(req.query?.period || '').toLowerCase() === 'today';
+    const period = exactToday ? 1 : parsePeriod(req.query?.period);
+    const startDate = startDateFromPeriod(period, exactToday);
     const supabase = getAdminClient();
 
     try {

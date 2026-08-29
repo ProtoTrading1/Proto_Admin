@@ -2,7 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAdminKey } from './_admin-auth.js';
 import { summariseCustomerAttention } from '../lib/customer-attention.mjs';
 
-const RANGES = { day: 1, week: 7, month: 30, quarter: 90 };
+const RANGES = { today: 1, day: 1, week: 7, month: 30, quarter: 90 };
+
+function johannesburgTodayStartIso(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00+02:00`).toISOString();
+}
 
 function client() {
   return createClient(
@@ -31,7 +38,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const range = RANGES[req.query.range] ? String(req.query.range) : 'month';
-  const since = new Date(Date.now() - RANGES[range] * 86400000).toISOString();
+  const since = range === 'today' ? johannesburgTodayStartIso() : new Date(Date.now() - RANGES[range] * 86400000).toISOString();
   const supabase = client();
   const { data, error } = await supabase.from('customer_content_attention')
     .select('customer_id, content_type, entity_id, entity_label, active_seconds, started_at, last_seen_at')

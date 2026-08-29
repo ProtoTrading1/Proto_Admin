@@ -12,6 +12,23 @@ import { callPreviewAnalyticsGateway, previewAnalyticsGatewayEnabled } from './_
 export const config = { maxDuration: 60 };
 
 export const READ_ONLY_PREVIEW_MESSAGE = 'This preview is read-only. Nothing was changed.';
+export const ANALYTICS_FOCUS = new Set(['overview', 'orders', 'customer_attention', 'search', 'baskets']);
+
+export function normalizeAnalyticsFocus(value) {
+  const focus = String(value || '').trim().toLowerCase();
+  return ANALYTICS_FOCUS.has(focus) ? focus : 'overview';
+}
+
+export function focusAnalyticsSnapshot(snapshot, focus) {
+  const base = { periodDays: snapshot.periodDays, periodLabel: snapshot.periodLabel, focus };
+  if (focus === 'customer_attention') {
+    return { ...base, attention: snapshot.attention, orders: { topProducts: snapshot.orders?.topProducts || [], topCategories: snapshot.orders?.topCategories || [] } };
+  }
+  if (focus === 'orders') return { ...base, orders: snapshot.orders };
+  if (focus === 'search') return { ...base, search: snapshot.search, orders: { count: snapshot.orders?.count || 0, revenueExVat: snapshot.orders?.revenueExVat || 0 } };
+  if (focus === 'baskets') return { ...base, baskets: snapshot.baskets, orders: { count: snapshot.orders?.count || 0, revenueExVat: snapshot.orders?.revenueExVat || 0 } };
+  return { ...snapshot, focus };
+}
 
 export function isProductionAnalyticsRuntime(env = process.env) {
   return String(env.VERCEL_ENV || '').trim().toLowerCase() === 'production';
@@ -39,7 +56,7 @@ export async function invokeReadHandler(handler, req, query = {}) {
   return body || {};
 }
 
-export async function buildServerSnapshot(req, periodDays, handlers = {}) {
+export async function buildServerSnapshot(req, periodDays, handlers = {}, periodKey = 'rolling', focus = 'overview') {
   const sources = {
     attention: customerAttentionHandler,
     orders: orderAnalyticsHandler,
@@ -47,15 +64,21 @@ export async function buildServerSnapshot(req, periodDays, handlers = {}) {
     baskets: abandonedBasketsHandler,
     ...handlers,
   };
-  const range = { 7: 'week', 30: 'month', 90: 'quarter' }[periodDays];
+  const range = periodKey === 'today' ? 'today' : { 1: 'day', 7: 'week', 30: 'month', 90: 'quarter' }[periodDays];
+  const period = periodKey === 'today' ? 'today' : String(periodDays);
+  const needsAttention = focus === 'overview' || focus === 'customer_attention';
+  const needsOrders = ['overview', 'orders', 'customer_attention', 'search', 'baskets'].includes(focus);
+  const needsSearch = focus === 'overview' || focus === 'search';
+  const needsBaskets = focus === 'overview' || focus === 'baskets';
   const [attention, orders, search, baskets] = await Promise.all([
-    invokeReadHandler(sources.attention, req, { range }),
-    invokeReadHandler(sources.orders, req, { period: String(periodDays) }),
-    invokeReadHandler(sources.search, req, { period: String(periodDays) }),
-    invokeReadHandler(sources.baskets, req),
+    needsAttention ? invokeReadHandler(sources.attention, req, { range }) : {},
+    needsOrders ? invokeReadHandler(sources.orders, req, { period }) : {},
+    needsSearch ? invokeReadHandler(sources.search, req, { period }) : {},
+    needsBaskets ? invokeReadHandler(sources.baskets, req) : {},
   ]);
   return {
     periodDays,
+    periodLabel: periodKey === 'today' ? 'Today' : `${periodDays}-day view`,
     attention: {
       available: attention.available,
       totalActiveSeconds: attention.totalActiveSeconds,
@@ -84,11 +107,15 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const limit = await checkRateLimit({ bucket: `codex-analytics:${requester}`, max: 10, windowSeconds: 3600 });
     if (!limit.allowed) return res.status(429).json({ error: 'Codex analysis limit reached. Try again later.' });
-    const periodDays = [7, 30, 90].includes(Number(req.body?.periodDays)) ? Number(req.body.periodDays) : 30;
+    const periodDays = [1, 7, 30, 90].includes(Number(req.body?.periodDays)) ? Number(req.body.periodDays) : 30;
+    const periodKey = req.body?.periodKey === 'today' && periodDays === 1 ? 'today' : 'rolling';
+    const focus = normalizeAnalyticsFocus(req.body?.focus);
     const sourceSnapshot = previewAnalyticsGatewayEnabled()
-      ? await callPreviewAnalyticsGateway('snapshot', { periodDays })
-      : await buildServerSnapshot(req, periodDays);
-    const { snapshot, referenceMap } = prepareCodexSnapshot(sourceSnapshot);
+      ? await callPreviewAnalyticsGateway('snapshot', { periodDays, periodKey })
+      : await buildServerSnapshot(req, periodDays, {}, periodKey, focus);
+    const prepared = prepareCodexSnapshot(sourceSnapshot);
+    const snapshot = focusAnalyticsSnapshot({ ...prepared.snapshot, periodLabel: sourceSnapshot.periodLabel }, focus);
+    const { referenceMap } = prepared;
     const snapshotHash = createHash('sha256')
       .update(JSON.stringify({ snapshot, referenceMap }))
       .digest('hex');
