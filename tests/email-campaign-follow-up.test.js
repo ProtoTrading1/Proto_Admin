@@ -31,4 +31,11 @@ describe('email campaign follow-up audiences', () => {
     expect(analytics).toMatch(/onCompose\?\.\(\{ audience: 'selected', recipients: active\.emails \}\)/);
     expect(analytics).not.toContain('sendCustomerEmailBroadcast');
   });
+
+  it('explains the different CRM scopes to prevent source confusion', () => {
+    const comms = fs.readFileSync(new URL('../src/components/CommsPanel.jsx', import.meta.url), 'utf8');
+    expect(comms).toContain('Contacts = approved portal customers');
+    expect(comms).toContain('Groups = broader saved audiences');
+    expect(comms).toContain('Analytics = every logged campaign send');
+  });
 });

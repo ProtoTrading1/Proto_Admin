@@ -167,8 +167,8 @@ export default function CommsPanel({ onCompose, onShowToast }) {
         <div>
           <h2 className="adm-section-title">Email CRM</h2>
           <p className="adm-section-note">
-            Your approved site customers. Filter by business type, tick the ones you want, and send — or email a whole
-            audience. Contacts come straight from the portal, not Brevo.
+            Your approved portal customers. Filter by business type, tick the ones you want, and send — or email a
+            whole audience. Groups and campaign analytics can include imported or pre-registration contacts as well.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -181,6 +181,13 @@ export default function CommsPanel({ onCompose, onShowToast }) {
             Send email
           </button>
         </div>
+      </div>
+
+      <div className="crm-campaign-summary" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <strong>CRM scope</strong>
+        <span>Contacts = approved portal customers</span>
+        <span>Groups = broader saved audiences</span>
+        <span>Analytics = every logged campaign send</span>
       </div>
 
       <div className="adm-customer-tabs" style={{ marginBottom: 12 }}>
