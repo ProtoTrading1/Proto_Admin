@@ -10,6 +10,12 @@ import abandonedBasketsHandler from './abandoned-baskets.js';
 
 export const config = { maxDuration: 60 };
 
+export const READ_ONLY_PREVIEW_MESSAGE = 'This preview is read-only. Nothing was changed.';
+
+export function isProductionAnalyticsRuntime(env = process.env) {
+  return String(env.VERCEL_ENV || '').trim().toLowerCase() === 'production';
+}
+
 function db() {
   return createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 }
@@ -62,8 +68,11 @@ export async function buildServerSnapshot(req, periodDays, handlers = {}) {
 }
 
 export default async function handler(req, res) {
-  if (!(await requireAdminKey(req, res))) return;
   res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'POST' && !isProductionAnalyticsRuntime()) {
+    return res.status(409).json({ error: READ_ONLY_PREVIEW_MESSAGE });
+  }
+  if (!(await requireAdminKey(req, res))) return;
   const supabase = db();
   const admin = await verifyAdminUser(req);
   const requester = admin?.id ? `admin-user:${admin.id}` : 'admin-service';

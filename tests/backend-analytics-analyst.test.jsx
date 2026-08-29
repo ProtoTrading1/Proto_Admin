@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { waitForJob } from '../src/components/BackendAnalyticsAnalyst.jsx';
+import { requireCreatedJobId, waitForJob } from '../src/components/BackendAnalyticsAnalyst.jsx';
 
 describe('Backend Analyst polling', () => {
   beforeEach(() => {
@@ -35,5 +35,12 @@ describe('Backend Analyst polling', () => {
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves the useful read-only preview message', () => {
+    expect(() => requireCreatedJobId(
+      { ok: false, status: 409 },
+      { error: 'This preview is read-only. Nothing was changed.' },
+    )).toThrow('This preview is read-only. Nothing was changed.');
   });
 });

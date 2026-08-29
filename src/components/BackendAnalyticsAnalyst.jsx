@@ -49,6 +49,13 @@ export async function waitForJob(jobId, signal) {
   throw new Error('Codex is taking longer than expected. You can run the report again shortly.');
 }
 
+export function requireCreatedJobId(response, payload = {}) {
+  if (!response.ok) throw new Error(payload.error || 'The backend analyst could not run');
+  const jobId = payload.id || payload.jobId;
+  if (!jobId) throw new Error('The Codex analytics job was not created');
+  return jobId;
+}
+
 const severityLabel = { high: 'Priority', medium: 'Review', low: 'Note' };
 
 export default function BackendAnalyticsAnalyst() {
@@ -97,9 +104,7 @@ export default function BackendAnalyticsAnalyst() {
         signal: controller.signal,
       });
       const json = await response.json().catch(() => ({}));
-      if (!response.ok && response.status !== 409) throw new Error(json.error || 'The backend analyst could not run');
-      const jobId = json.id || json.jobId;
-      if (!jobId) throw new Error('The Codex analytics job was not created');
+      const jobId = requireCreatedJobId(response, json);
       window.localStorage.setItem(PENDING_JOB_KEY, JSON.stringify({ id: jobId, period }));
       setReport(await waitForJob(jobId, controller.signal));
     } catch (analyseError) {

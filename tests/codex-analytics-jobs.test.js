@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { buildServerSnapshot } from '../api/codex-analytics-jobs.js';
+import { describe, expect, it, vi } from 'vitest';
+
+const { checkRateLimitMock, createClientMock } = vi.hoisted(() => ({
+  checkRateLimitMock: vi.fn(),
+  createClientMock: vi.fn(),
+}));
+
+vi.mock('../api/_rate-limit.js', () => ({ checkRateLimit: checkRateLimitMock }));
+vi.mock('@supabase/supabase-js', () => ({ createClient: createClientMock }));
+
+import handler, { READ_ONLY_PREVIEW_MESSAGE, buildServerSnapshot, isProductionAnalyticsRuntime } from '../api/codex-analytics-jobs.js';
 
 function source(payload, assertions = () => {}) {
   return async (req, res) => {
@@ -9,6 +18,39 @@ function source(payload, assertions = () => {}) {
 }
 
 describe('server-authoritative Codex analytics jobs', () => {
+  it('blocks preview writes before authentication or database access', async () => {
+    const originalVercelEnv = process.env.VERCEL_ENV;
+    process.env.VERCEL_ENV = 'preview';
+    const response = {
+      headers: {},
+      statusCode: 200,
+      payload: null,
+      setHeader(name, value) { this.headers[name] = value; },
+      status(code) { this.statusCode = code; return this; },
+      json(payload) { this.payload = payload; return this; },
+    };
+
+    try {
+      await handler({ method: 'POST', headers: {}, body: { periodDays: 30 } }, response);
+    } finally {
+      if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = originalVercelEnv;
+    }
+
+    expect(response.statusCode).toBe(409);
+    expect(response.payload).toEqual({ error: READ_ONLY_PREVIEW_MESSAGE });
+    expect(response.headers['Cache-Control']).toBe('no-store');
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(createClientMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed outside an explicit production runtime', () => {
+    expect(isProductionAnalyticsRuntime({ VERCEL_ENV: 'production' })).toBe(true);
+    expect(isProductionAnalyticsRuntime({ VERCEL_ENV: 'preview' })).toBe(false);
+    expect(isProductionAnalyticsRuntime({ VERCEL_ENV: 'development' })).toBe(false);
+    expect(isProductionAnalyticsRuntime({})).toBe(false);
+  });
+
   it('builds the model snapshot from authenticated server reads', async () => {
     const req = { headers: { authorization: 'Bearer verified-admin' } };
     const snapshot = await buildServerSnapshot(req, 30, {
