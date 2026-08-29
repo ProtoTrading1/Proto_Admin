@@ -20,6 +20,8 @@ export default async function handler(req, res) {
   const action = String(req.body?.action || '');
 
   if (action === 'claim') {
+    const maintenance = await supabase.rpc('run_codex_analytics_maintenance');
+    if (maintenance.error) console.error('Codex analytics retention maintenance failed:', maintenance.error.message);
     const { data, error } = await supabase.rpc('claim_codex_analytics_job', { p_worker_id: String(req.body?.workerId || 'hermes').slice(0, 100) });
     if (error) return res.status(400).json({ error: error.message });
     const job = data?.[0];
@@ -28,25 +30,35 @@ export default async function handler(req, res) {
 
   const id = String(req.body?.jobId || '');
   if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'Invalid job id' });
+  const claimToken = String(req.body?.claimToken || '');
+  if (!/^[0-9a-f-]{36}$/i.test(claimToken)) return res.status(400).json({ error: 'Invalid claim token' });
+  const workerId = String(req.body?.workerId || '').slice(0, 100);
   if (action === 'complete') {
     const result = normalizeCodexReport(req.body?.result || {});
     if (!result.summary) return res.status(400).json({ error: 'Report summary is required' });
-    const claimToken = String(req.body?.claimToken || '');
     const usage = req.body?.usage || {};
-    const { data, error } = await supabase.from('codex_analytics_jobs').update({
-      status: 'completed', result, error: null, completed_at: new Date().toISOString(), lease_until: null, claim_token: null,
-      input_tokens: Math.max(0, Math.min(1000000, Number(usage.inputTokens) || 0)),
-      output_tokens: Math.max(0, Math.min(100000, Number(usage.outputTokens) || 0)),
-      model: String(usage.model || '').slice(0, 80),
-    }).eq('id', id).eq('status', 'running').eq('worker_id', String(req.body?.workerId || '')).eq('claim_token', claimToken).gt('lease_until', new Date().toISOString()).select('id');
+    const { data, error } = await supabase.rpc('complete_codex_analytics_job', {
+      p_job_id: id,
+      p_worker_id: workerId,
+      p_claim_token: claimToken,
+      p_result: result,
+      p_model: String(usage.model || '').slice(0, 80),
+      p_input_tokens: Math.max(0, Math.min(1000000, Number(usage.inputTokens) || 0)),
+      p_output_tokens: Math.max(0, Math.min(100000, Number(usage.outputTokens) || 0)),
+    });
     if (error) return res.status(400).json({ error: error.message });
-    if (!data?.length) return res.status(409).json({ error: 'Job lease is no longer valid' });
+    if (data !== true) return res.status(409).json({ error: 'Job lease is no longer valid' });
     return res.status(200).json({ ok: true });
   }
   if (action === 'fail') {
-    const { data, error } = await supabase.from('codex_analytics_jobs').update({ status: 'failed', error: String(req.body?.error || 'Codex analysis failed').slice(0, 500), completed_at: new Date().toISOString(), lease_until: null, claim_token: null }).eq('id', id).eq('status', 'running').eq('worker_id', String(req.body?.workerId || '')).eq('claim_token', String(req.body?.claimToken || '')).gt('lease_until', new Date().toISOString()).select('id');
+    const { data, error } = await supabase.rpc('fail_codex_analytics_job', {
+      p_job_id: id,
+      p_worker_id: workerId,
+      p_claim_token: claimToken,
+      p_error: String(req.body?.error || 'Codex analysis failed').slice(0, 500),
+    });
     if (error) return res.status(400).json({ error: error.message });
-    if (!data?.length) return res.status(409).json({ error: 'Job lease is no longer valid' });
+    if (data !== true) return res.status(409).json({ error: 'Job lease is no longer valid' });
     return res.status(200).json({ ok: true });
   }
   return res.status(400).json({ error: 'Unknown worker action' });

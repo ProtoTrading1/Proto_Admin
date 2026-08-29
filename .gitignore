@@ -6,6 +6,7 @@ dist
 .env*
 data/*.numbers
 portal-tmp
+.tmp-vitest/
 
 # Bridge launcher generated on BLADERUNNER-PC — it can carry SQL_PASSWORD /
 # STOCK_SQL_BRIDGE_KEY inline, so it must never be committed. Secrets belong

@@ -1,44 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bot, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 
 const PERIODS = [7, 30, 90];
-const ATTENTION_RANGE = { 7: 'week', 30: 'month', 90: 'quarter' };
+const PENDING_JOB_KEY = 'proto_pending_codex_analytics_job';
 
-async function readJson(url) {
-  const response = await fetch(url);
+async function readJson(url, { signal } = {}) {
+  const response = await fetch(url, { signal });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Could not load ${url}`);
+  if (!response.ok) {
+    const error = new Error(data.error || `Could not load ${url}`);
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
-function analystSnapshot(periodDays, attention, orders, search, baskets) {
-  return {
-    periodDays,
-    attention: {
-      available: attention.available,
-      totalActiveSeconds: attention.totalActiveSeconds,
-      products: attention.products,
-      categories: attention.categories,
-    },
-    orders: {
-      summary: orders.summary,
-      topProducts: orders.topOrderedProducts,
-      topCategories: orders.topOrderedCategories,
-    },
-    search: {
-      kpis: search.kpis,
-      zeroResultTerms: search.zeroResultTerms,
-    },
-    baskets: baskets.summary,
-  };
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => {
+      window.clearTimeout(timer);
+      const error = new Error('Polling cancelled');
+      error.name = 'AbortError';
+      reject(error);
+    }, { once: true });
+  });
 }
 
-async function waitForJob(jobId) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    const job = await readJson(`/api/codex-analytics-jobs?id=${encodeURIComponent(jobId)}`);
-    if (job.status === 'completed') return job.result;
-    if (job.status === 'failed') throw new Error(job.error || 'Codex analysis failed');
+export async function waitForJob(jobId, signal) {
+  for (let attempt = 0; attempt < 75; attempt += 1) {
+    await delay(attempt < 30 ? 2000 : 4000, signal);
+    let job;
+    try {
+      job = await readJson(`/api/codex-analytics-jobs?id=${encodeURIComponent(jobId)}`, { signal });
+    } catch (error) {
+      if (error.status === 400 || error.status === 404) window.localStorage.removeItem(PENDING_JOB_KEY);
+      throw error;
+    }
+    if (job.status === 'completed') {
+      window.localStorage.removeItem(PENDING_JOB_KEY);
+      return job.result;
+    }
+    if (job.status === 'failed') {
+      window.localStorage.removeItem(PENDING_JOB_KEY);
+      throw new Error(job.error || 'Codex analysis failed');
+    }
   }
   throw new Error('Codex is taking longer than expected. You can run the report again shortly.');
 }
@@ -50,27 +56,52 @@ export default function BackendAnalyticsAnalyst() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const pollController = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      const pending = JSON.parse(window.localStorage.getItem(PENDING_JOB_KEY) || 'null');
+      if (!pending?.id) return undefined;
+      const controller = new AbortController();
+      pollController.current = controller;
+      setLoading(true);
+      if (PERIODS.includes(Number(pending.period))) setPeriod(Number(pending.period));
+      waitForJob(pending.id, controller.signal).then((result) => {
+        if (!cancelled) setReport(result);
+      }).catch((resumeError) => {
+        if (!cancelled && resumeError.name !== 'AbortError') setError(resumeError.message);
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    } catch {
+      window.localStorage.removeItem(PENDING_JOB_KEY);
+    }
+    return () => {
+      cancelled = true;
+      pollController.current?.abort();
+    };
+  }, []);
 
   const analyse = async () => {
     setLoading(true);
     setError('');
     try {
-      const [attention, orders, search, baskets] = await Promise.all([
-        readJson(`/api/customer-attention?range=${ATTENTION_RANGE[period]}`),
-        readJson(`/api/order-analytics?period=${period}`),
-        readJson(`/api/search-analytics-dashboard?period=${period}`),
-        readJson('/api/abandoned-baskets'),
-      ]);
+      pollController.current?.abort();
+      const controller = new AbortController();
+      pollController.current = controller;
       const response = await fetch('/api/codex-analytics-jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot: analystSnapshot(period, attention, orders, search, baskets) }),
+        body: JSON.stringify({ periodDays: period }),
+        signal: controller.signal,
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok && response.status !== 409) throw new Error(json.error || 'The backend analyst could not run');
       const jobId = json.id || json.jobId;
       if (!jobId) throw new Error('The Codex analytics job was not created');
-      setReport(await waitForJob(jobId));
+      window.localStorage.setItem(PENDING_JOB_KEY, JSON.stringify({ id: jobId, period }));
+      setReport(await waitForJob(jobId, controller.signal));
     } catch (analyseError) {
       setError(analyseError.message);
       setReport(null);

@@ -5,20 +5,36 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
-const baseUrl = String(process.env.PROTO_ADMIN_URL || 'https://admin.proto.co.za').replace(/\/$/, '');
+const configuredBaseUrl = String(process.env.PROTO_ADMIN_URL || '').trim();
 const secret = process.env.CODEX_ANALYTICS_WORKER_SECRET;
+const protectionBypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '').trim();
 const codex = process.env.CODEX_BIN || '/opt/proto-analytics/codex-cli/node_modules/.bin/codex';
 const schema = process.env.CODEX_REPORT_SCHEMA || '/opt/proto-analytics/worker/analytics-report.schema.json';
 const workerId = process.env.CODEX_WORKER_ID || 'hermes-analytics-1';
 const model = process.env.CODEX_ANALYTICS_MODEL || 'gpt-5.6-luna';
 
 if (!secret) throw new Error('CODEX_ANALYTICS_WORKER_SECRET is required');
+if (!configuredBaseUrl) throw new Error('PROTO_ADMIN_URL is required; the worker never defaults to production');
+const base = new URL(configuredBaseUrl);
+if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) {
+  throw new Error('PROTO_ADMIN_URL must be a credential-free HTTPS origin');
+}
+const allowedHost = String(process.env.PROTO_ADMIN_ALLOWED_HOST || '').trim().toLowerCase();
+if (!allowedHost) throw new Error('PROTO_ADMIN_ALLOWED_HOST is required');
+if (base.hostname.toLowerCase() !== allowedHost || (base.port && base.port !== '443') || (base.pathname !== '/' && base.pathname !== '')) {
+  throw new Error('PROTO_ADMIN_URL does not match PROTO_ADMIN_ALLOWED_HOST');
+}
+const workerEndpoint = new URL('/api/codex-analytics-worker', base);
 
 async function workerRequest(body) {
-  const response = await fetch(`${baseUrl}/api/codex-analytics-worker`, {
+  const headers = { 'Content-Type': 'application/json', 'x-codex-worker-secret': secret };
+  if (protectionBypass) headers['x-vercel-protection-bypass'] = protectionBypass;
+  const response = await fetch(workerEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-codex-worker-secret': secret },
+    headers,
     body: JSON.stringify(body),
+    redirect: 'error',
+    signal: AbortSignal.timeout(15000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `Worker endpoint returned ${response.status}`);
@@ -43,8 +59,10 @@ try {
     `AGGREGATE_ANALYTICS_JSON=${snapshot}`,
   ].join('\n');
   const execution = await run(codex, [
-    'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--sandbox', 'read-only',
-    '--skip-git-repo-check', '--json', '-m', model, '-c', 'model_reasoning_effort="low"',
+    'exec', '--ephemeral', '--ignore-user-config', '--ignore-rules', '--strict-config', '--sandbox', 'read-only',
+    '--skip-git-repo-check', '--json', '--color', 'never', '-m', model, '-c', 'model_reasoning_effort="low"',
+    '-c', 'approval_policy="never"', '-c', 'features.shell_tool=false', '-c', 'features.unified_exec=false',
+    '-c', 'agents.enabled=false', '-c', 'web_search="disabled"',
     '-C', work, '--output-schema', schema, '--output-last-message', output, prompt,
   ], {
     timeout: 120000,
