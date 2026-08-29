@@ -46,6 +46,26 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
+function recipientStatusRows(campaign) {
+  const snapshot = uniqueEmails(campaign.recipientEmails);
+  const opened = new Set(uniqueEmails(campaign.eventEmails?.opened));
+  const clicked = new Set(uniqueEmails(campaign.eventEmails?.clicked));
+  const bounced = new Set(uniqueEmails(campaign.eventEmails?.bounced));
+  const unsubscribed = new Set(uniqueEmails(campaign.eventEmails?.unsubscribed));
+  const complained = new Set(uniqueEmails(campaign.eventEmails?.complained));
+  const known = uniqueEmails([...opened, ...clicked, ...bounced, ...unsubscribed, ...complained]);
+  const emails = snapshot.length ? snapshot : known;
+  return emails.map((email) => {
+    let status = 'Sent — no event recorded';
+    if (complained.has(email)) status = 'Spam complaint';
+    else if (unsubscribed.has(email)) status = 'Unsubscribed';
+    else if (bounced.has(email)) status = 'Bounced';
+    else if (clicked.has(email)) status = 'Clicked';
+    else if (opened.has(email)) status = 'Opened — no click';
+    return [email, status];
+  });
+}
+
 const SORTS = {
   date: (a, b) => new Date(b.sentAt || 0) - new Date(a.sentAt || 0),
   sent: (a, b) => b.sent - a.sent,
@@ -156,16 +176,16 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
 
   const exportCsv = () => {
     downloadCsv('proto-email-campaigns.csv', [
-      ['Sent at', 'Subject', 'Audience', 'Business types', 'Recipients', 'Delivered', 'Delivered %', 'Opened (people)', 'Open %', 'Clicked (people)', 'Click %', 'Bounced', 'Bounce %'],
+      ['Sent at', 'Subject', 'Audience', 'Business types', 'Recipients', 'Send accepted', 'Delivery estimate', 'Delivery %', 'Opened (people)', 'Open %', 'Clicked (people)', 'Click %', 'Bounced', 'Bounce %', 'Opt-outs'],
       ...rows.map((r) => [
         r.sentAt ? new Date(r.sentAt).toISOString() : '',
         r.subject || '(no subject)',
         r.audience || '',
         (r.businessTypes || []).join(' / '),
-        r.sent, r.delivered, `${r.deliveryRate}%`,
+        r.sent, r.delivered, 'Accepted less bounces', `${r.deliveryRate}%`,
         r.openedUnique, `${r.openRate}%`,
         r.clickedUnique, `${r.clickRate}%`,
-        r.bounced, `${r.bounceRate}%`,
+        r.bounced, `${r.bounceRate}%`, r.unsubscribed,
       ]),
     ]);
   };
@@ -236,8 +256,8 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
                 <th style={{ minWidth: 150 }}>Sent</th>
                 <th style={{ minWidth: 220 }}>Subject</th>
                 <th style={{ minWidth: 130 }}>Audience</th>
-                <th className="adm-sheet__num">Recipients</th>
-                <th className="adm-sheet__num">Delivered</th>
+                <th className="adm-sheet__num">Send accepted</th>
+                <th className="adm-sheet__num">Delivery estimate</th>
                 <th className="adm-sheet__num">Opened</th>
                 <th className="adm-sheet__num">Clicked</th>
                 <th className="adm-sheet__num">Bounced</th>
@@ -284,9 +304,9 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
       )}
 
       <p className="adm-section-note" style={{ marginTop: 12 }}>
-        Delivered means emails accepted by Brevo, less recorded bounces. Open and click rates count each PERSON once,
-        measured against recipients. Engagement stats arrive from Brevo webhooks, so a campaign sent moments ago may
-        still show zeros.
+        “Send accepted” means the Brevo API accepted the message. “Delivery estimate” subtracts recorded bounces;
+        it is not a provider-confirmed delivery total. Open and click rates count each PERSON once, measured against
+        accepted sends. Engagement stats arrive from Brevo webhooks, so a campaign sent moments ago may still show zeros.
       </p>
 
       {detail && <CampaignDetail campaign={detail} onClose={() => setDetail(null)} onCompose={onCompose} />}
@@ -352,7 +372,7 @@ function CampaignDetail({ campaign, onClose, onCompose }) {
   const exportRecipients = () => {
     downloadCsv(`campaign-${(campaign.subject || 'email').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.csv`, [
       ['Email', 'Status'],
-      ...groups.flatMap((g) => g.emails.map((e) => [e, g.label])),
+      ...recipientStatusRows(campaign),
     ]);
   };
 

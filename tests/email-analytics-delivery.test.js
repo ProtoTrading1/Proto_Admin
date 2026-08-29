@@ -13,7 +13,7 @@ describe('email campaign delivery analytics', () => {
   });
 
   it('explains the delivery calculation in the dashboard', () => {
-    expect(source).toContain('Delivered means emails accepted by Brevo, less recorded bounces.');
+    expect(source).toContain('“Delivery estimate” subtracts recorded bounces');
   });
 
   it('separates reporting periods and draft campaigns from sent campaigns', () => {
@@ -26,5 +26,16 @@ describe('email campaign delivery analytics', () => {
     expect(source).toContain('label="Opt-outs"');
     expect(source).toContain('<th className="adm-sheet__num">Opt-outs</th>');
     expect(source).toContain("r.hasRecipientSnapshot ? 'Tracked' : 'Legacy'");
+  });
+
+  it('labels delivery as an estimate instead of claiming provider confirmation', () => {
+    expect(source).toContain('Delivery estimate');
+    expect(source).toContain('it is not a provider-confirmed delivery total');
+  });
+
+  it('exports one status row per recipient rather than duplicating tab membership', () => {
+    expect(source).toContain('function recipientStatusRows(campaign)');
+    expect(source).toContain('...recipientStatusRows(campaign)');
+    expect(source).not.toContain('...groups.flatMap((g) => g.emails.map((e) => [e, g.label]))');
   });
 });
