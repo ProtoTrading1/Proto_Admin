@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { fetchCustomerAudience, fetchRecipientsByEmail, sendBroadcastBatch } from './_brevo-email.js';
 import { appendEmailCampaign } from './_email-campaigns.js';
-import { markCustomersEmailed } from './_customer-email-status.js';
+import { markCustomersEmailed, markCrmContactsEmailed } from './_customer-email-status.js';
 
 export const VALID_EMAIL_AUDIENCE = new Set(['requests', 'regular', 'proto-active', 'all-portal', 'all-approved', 'selected', 'group']);
 
@@ -46,22 +46,24 @@ export async function runEmailBroadcast({ audience, subject, introText = '', htm
     htmlBlock,
   });
   const failedRecipientEmails = new Set((failedEmails || []).filter(Boolean));
+  const successfulRecipientEmails = recipients
+    .map((recipient) => String(recipient.email || '').trim().toLowerCase())
+    .filter((email) => email && !failedRecipientEmails.has(email));
+  const sentAt = new Date().toISOString();
 
   try {
     await appendEmailCampaign({
       subject,
       audience,
       businessTypes: Array.isArray(businessTypes) ? businessTypes.filter(Boolean) : [],
-      sentAt: new Date().toISOString(),
+      sentAt,
       recipientCount: recipients.length,
       sent,
       failed,
       // Snapshot successful recipients so the analytics screen can form a
       // trustworthy "no recorded open" follow-up audience later. Event lists
       // alone cannot tell us who did not open an older campaign.
-      recipientEmails: recipients
-        .map((recipient) => String(recipient.email || '').trim().toLowerCase())
-        .filter((email) => email && !failedRecipientEmails.has(email)),
+      recipientEmails: successfulRecipientEmails,
       messageIds: messageIds || [],
       events: {},
     });
@@ -71,7 +73,10 @@ export async function runEmailBroadcast({ audience, subject, introText = '', htm
 
   // Stamp the per-customer "last email sent" status (best-effort, analytics only).
   try {
-    await markCustomersEmailed(sb, recipients.map((r) => r.email), 'campaign');
+    await Promise.all([
+      markCustomersEmailed(sb, successfulRecipientEmails, 'campaign', sentAt),
+      markCrmContactsEmailed(sb, successfulRecipientEmails, subject, sentAt),
+    ]);
   } catch { /* best effort */ }
 
   return { ok: failed === 0, total: recipients.length, sent, failed, errors };

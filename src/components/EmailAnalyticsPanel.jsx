@@ -57,6 +57,7 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState('date');
+  const [windowKey, setWindowKey] = useState('all');
   const [detail, setDetail] = useState(null);
 
   const load = useCallback(async () => {
@@ -96,6 +97,8 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
       const opened = e.opened || 0;
       const clicked = e.clicked || 0;
       const bounced = e.bounced || 0;
+      const unsubscribed = e.unsubscribed || 0;
+      const complained = e.complained || 0;
       const delivered = Math.max(0, sent - bounced);
       // Opens/clicks are counted per EVENT (one person opening 3 times is 3),
       // so rates are measured against unique recipients where we have them and
@@ -109,16 +112,25 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
         opened,
         clicked,
         bounced,
+        unsubscribed,
+        complained,
         openedUnique,
         clickedUnique,
+        hasRecipientSnapshot: Array.isArray(c.recipientEmails) && c.recipientEmails.length > 0,
+        isDraft: sent === 0 && !c.sentAt,
         deliveryRate: Math.min(100, pct(delivered, sent)),
         openRate: Math.min(100, pct(openedUnique, sent)),
         clickRate: Math.min(100, pct(clickedUnique, sent)),
         bounceRate: Math.min(100, pct(bounced, sent)),
       };
     });
-    return mapped.sort(SORTS[sort] || SORTS.date);
-  }, [campaigns, sort]);
+    const since = windowKey === 'all'
+      ? null
+      : Date.now() - Number(windowKey.replace('d', '')) * 24 * 60 * 60 * 1000;
+    return mapped
+      .filter((row) => !since || (row.sentAt && new Date(row.sentAt).getTime() >= since))
+      .sort(SORTS[sort] || SORTS.date);
+  }, [campaigns, sort, windowKey]);
 
   const totals = useMemo(() => rows.reduce((acc, r) => ({
     campaigns: acc.campaigns + 1,
@@ -127,7 +139,20 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
     openedUnique: acc.openedUnique + r.openedUnique,
     clickedUnique: acc.clickedUnique + r.clickedUnique,
     bounced: acc.bounced + r.bounced,
-  }), { campaigns: 0, sent: 0, delivered: 0, openedUnique: 0, clickedUnique: 0, bounced: 0 }), [rows]);
+    unsubscribed: acc.unsubscribed + r.unsubscribed,
+    complained: acc.complained + r.complained,
+    drafts: acc.drafts + (r.isDraft ? 1 : 0),
+    snapshots: acc.snapshots + (r.hasRecipientSnapshot ? 1 : 0),
+  }), {
+    campaigns: 0, sent: 0, delivered: 0, openedUnique: 0, clickedUnique: 0, bounced: 0,
+    unsubscribed: 0, complained: 0, drafts: 0, snapshots: 0,
+  }), [rows]);
+
+  const sentRows = rows.filter((row) => !row.isDraft && row.sent > 0);
+  const legacyRows = sentRows.filter((row) => !row.hasRecipientSnapshot).length;
+  const lastSentAt = sentRows.reduce((latest, row) => (
+    !latest || new Date(row.sentAt || 0) > new Date(latest) ? row.sentAt : latest
+  ), null);
 
   const exportCsv = () => {
     downloadCsv('proto-email-campaigns.csv', [
@@ -148,16 +173,34 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
   return (
     <div style={{ marginTop: 8 }}>
       <div className="adm-email-stats">
-        <Headline label="Campaigns" value={totals.campaigns} />
-        <Headline label="Emails sent" value={totals.sent.toLocaleString('en-ZA')} />
+        <Headline label="Sent campaigns" value={sentRows.length} sub={totals.drafts ? `${totals.drafts} draft${totals.drafts === 1 ? '' : 's'} excluded` : undefined} />
+        <Headline label="Accepted by Brevo" value={totals.sent.toLocaleString('en-ZA')} />
         <Headline label="Delivered" value={`${pct(totals.delivered, totals.sent)}%`} sub={`${totals.delivered.toLocaleString('en-ZA')} of ${totals.sent.toLocaleString('en-ZA')}`} />
         <Headline label="Opened" value={`${pct(totals.openedUnique, totals.sent)}%`} sub={`${totals.openedUnique.toLocaleString('en-ZA')} people`} />
         <Headline label="Clicked" value={`${pct(totals.clickedUnique, totals.sent)}%`} sub={`${totals.clickedUnique.toLocaleString('en-ZA')} people`} />
-        <Headline label="Bounced" value={`${pct(totals.bounced, totals.sent)}%`} sub={`${totals.bounced.toLocaleString('en-ZA')} addresses`} tone={totals.bounced > 0 ? 'bad' : undefined} />
+        <Headline label="Opt-outs" value={totals.unsubscribed.toLocaleString('en-ZA')} sub={totals.complained ? `${totals.complained} spam complaint${totals.complained === 1 ? '' : 's'}` : undefined} tone={totals.unsubscribed > 0 || totals.complained > 0 ? 'bad' : undefined} />
+      </div>
+
+      <div className="crm-campaign-summary" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <strong>Tracking confidence</strong>
+        <span>{legacyRows ? `${legacyRows} older campaign${legacyRows === 1 ? '' : 's'} without recipient snapshots` : 'Recipient snapshots available for every sent campaign'}</span>
+        <span className="adm-muted">Last send: {fmtDate(lastSentAt)}</span>
       </div>
 
       <div className="adm-email-analytics-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className="adm-muted" style={{ fontSize: 12, fontWeight: 700 }}>Period</span>
+          {[['all', 'All time'], ['30d', 'Last 30 days'], ['90d', 'Last 90 days']].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`adm-tab${windowKey === key ? ' adm-tab--active' : ''}`}
+              style={{ fontSize: 12, padding: '4px 10px' }}
+              onClick={() => setWindowKey(key)}
+            >
+              {label}
+            </button>
+          ))}
           <span className="adm-muted" style={{ fontSize: 12, fontWeight: 700 }}>Sort</span>
           {[['date', 'Newest'], ['sent', 'Most sent'], ['opened', 'Best open rate'], ['clicked', 'Best click rate']].map(([key, label]) => (
             <button
@@ -198,6 +241,8 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
                 <th className="adm-sheet__num">Opened</th>
                 <th className="adm-sheet__num">Clicked</th>
                 <th className="adm-sheet__num">Bounced</th>
+                <th className="adm-sheet__num">Opt-outs</th>
+                <th>Status</th>
                 <th />
               </tr>
             </thead>
@@ -224,6 +269,8 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
                     {r.bounced.toLocaleString('en-ZA')}
                     {r.bounced > 0 && <span className="adm-rate adm-rate--bad">{r.bounceRate}%</span>}
                   </td>
+                  <td className="adm-sheet__num">{r.unsubscribed.toLocaleString('en-ZA')}</td>
+                  <td className="adm-muted" style={{ fontSize: 12 }}>{r.isDraft ? 'Draft' : r.hasRecipientSnapshot ? 'Tracked' : 'Legacy'}</td>
                   <td>
                     <button type="button" className="adm-btn-ghost adm-btn--sm" onClick={() => setDetail(r)}>
                       Details
