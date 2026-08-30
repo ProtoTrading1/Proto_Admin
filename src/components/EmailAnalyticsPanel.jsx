@@ -230,7 +230,7 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {loading && <Loader2 size={15} className="spin" aria-label="Loading" />}
+          {loading && <span className="adm-email-loading" role="status" aria-live="polite"><Loader2 size={15} className="spin" aria-hidden="true" /> Loading campaign analytics…</span>}
           <button type="button" className="adm-btn-ghost adm-btn--sm" onClick={exportCsv} disabled={!rows.length}>
             <Download size={13} style={{ marginRight: 5, verticalAlign: -2 }} />
             Export CSV
@@ -241,11 +241,15 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
       {rows.length === 0 && !loading ? (
         <div className="adm-empty" style={{ padding: '32px 0' }}>
           <BarChart2 size={28} style={{ color: '#9ca3af', marginBottom: 8 }} />
-          <div>No email campaigns logged yet. Use <strong>Send email</strong> to start tracking.</div>
+          <div>
+            {campaigns.length
+              ? <>No campaigns match the selected period. <button type="button" className="adm-link-button" onClick={() => setWindowKey('all')}>Show all campaigns</button></>
+              : <>No email campaigns logged yet. Use <strong>Send email</strong> to start tracking.</>}
+          </div>
         </div>
       ) : (
         <div className="adm-table-scroll">
-          <table className="adm-sheet">
+          <table className="adm-sheet adm-email-campaign-table" aria-label="Email campaign performance">
             <thead>
               <tr>
                 <th style={{ minWidth: 150 }}>Sent</th>
@@ -264,29 +268,29 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="adm-muted" style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.sentAt)}</td>
-                  <td style={{ fontWeight: 700 }}>{r.subject || '(no subject)'}</td>
-                  <td className="adm-muted">
+                  <td data-label="Sent" className="adm-muted" style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.sentAt)}</td>
+                  <td data-label="Subject" style={{ fontWeight: 700 }}>{r.subject || '(no subject)'}</td>
+                  <td data-label="Audience" className="adm-muted">
                     {r.audience || '—'}
                     {r.businessTypes?.length ? <div style={{ fontSize: 11 }}>{r.businessTypes.join(', ')}</div> : null}
                   </td>
-                  <td className="adm-sheet__num">{r.sent.toLocaleString('en-ZA')}</td>
-                  <td className="adm-sheet__num">
+                  <td data-label="Send accepted" className="adm-sheet__num">{r.sent.toLocaleString('en-ZA')}</td>
+                  <td data-label="Delivery estimate" className="adm-sheet__num">
                     {r.delivered.toLocaleString('en-ZA')}<span className={rateClass(r.deliveryRate, { good: 90, warn: 60 })}>{r.deliveryRate}%</span>
                   </td>
-                  <td className="adm-sheet__num">
+                  <td data-label="Opened" className="adm-sheet__num">
                     {r.openedUnique.toLocaleString('en-ZA')}<span className={rateClass(r.openRate, { good: 25, warn: 10 })}>{r.openRate}%</span>
                   </td>
-                  <td className="adm-sheet__num">
+                  <td data-label="Clicked" className="adm-sheet__num">
                     {r.clickedUnique.toLocaleString('en-ZA')}<span className={rateClass(r.clickRate, { good: 10, warn: 3 })}>{r.clickRate}%</span>
                   </td>
-                  <td className="adm-sheet__num">
+                  <td data-label="Bounced" className="adm-sheet__num">
                     {r.bounced.toLocaleString('en-ZA')}
                     {r.bounced > 0 && <span className="adm-rate adm-rate--bad">{r.bounceRate}%</span>}
                   </td>
-                  <td className="adm-sheet__num">{r.unsubscribed.toLocaleString('en-ZA')}</td>
-                  <td className="adm-muted" style={{ fontSize: 12 }}>{r.isDraft ? 'Draft' : r.hasRecipientSnapshot ? 'Tracked' : 'Legacy'}</td>
-                  <td>
+                  <td data-label="Opt-outs" className="adm-sheet__num">{r.unsubscribed.toLocaleString('en-ZA')}</td>
+                  <td data-label="Status" className="adm-muted" style={{ fontSize: 12 }}>{r.isDraft ? 'Draft' : r.hasRecipientSnapshot ? 'Tracked' : 'Legacy'}</td>
+                  <td data-label="Actions">
                     <button type="button" className="adm-btn-ghost adm-btn--sm" onClick={() => setDetail(r)}>
                       Details
                     </button>

@@ -10016,6 +10016,24 @@ html, body { background: #f5f5f5; color: #111827; }
   cursor: pointer;
 }
 .adm-email-testbar__input { max-width: 260px; }
+.adm-email-send-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff7ed;
+  color: #7c2d12;
+  font-size: 13px;
+}
+.adm-email-send-summary > div { display: inline-flex; align-items: baseline; gap: 6px; }
+.adm-email-send-summary__label { color: #9a3412; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.adm-email-send-summary__hint { color: #9a3412; font-size: 12px; }
+@media (max-width: 600px) {
+  .adm-email-send-summary { align-items: flex-start; flex-direction: column; gap: 5px; padding: 12px 14px; }
+  .adm-email-send-summary__hint { font-size: 11px; }
+}
 
 /* ── Email analytics: spreadsheet view ───────────────────────────────────── */
 .adm-email-stats {
@@ -10049,6 +10067,8 @@ html, body { background: #f5f5f5; color: #111827; }
   flex-wrap: wrap;
   margin-bottom: 10px;
 }
+.adm-email-loading { display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 12px; font-weight: 700; }
+.adm-link-button { border: 0; padding: 0; background: transparent; color: #b91c1c; font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
 
 .adm-table-scroll { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
 .adm-sheet { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -10081,6 +10101,22 @@ html, body { background: #f5f5f5; color: #111827; }
 .adm-rate--good { background: #dcfce7; color: #15803d; }
 .adm-rate--warn { background: #fef3c7; color: #92400e; }
 .adm-rate--bad  { background: #fee2e2; color: #b91c1c; }
+
+@media (max-width: 720px) {
+  .adm-email-campaign-table,
+  .adm-email-campaign-table tbody,
+  .adm-email-campaign-table tr,
+  .adm-email-campaign-table td { display: block; width: auto; }
+  .adm-email-campaign-table thead { display: none; }
+  .adm-email-campaign-table tbody tr { margin: 0 0 10px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background: #fff; }
+  .adm-email-campaign-table tbody tr:nth-child(even) { background: #fff; }
+  .adm-email-campaign-table tbody td { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; min-height: 42px; padding: 9px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; white-space: normal !important; }
+  .adm-email-campaign-table tbody td::before { content: attr(data-label); flex: 0 0 auto; color: #64748b; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
+  .adm-email-campaign-table tbody td[data-label="Subject"] { display: block; text-align: left; font-size: 15px; }
+  .adm-email-campaign-table tbody td[data-label="Subject"]::before { display: block; margin-bottom: 4px; }
+  .adm-email-campaign-table tbody td[data-label="Actions"] { justify-content: flex-end; border-bottom: 0; background: #f8fafc; }
+  .adm-email-campaign-table tbody td[data-label="Actions"]::before { display: none; }
+}
 
 /* ── Live/off status badge (checkout promo, popup) ───────────────────────── */
 .adm-live-badge {
