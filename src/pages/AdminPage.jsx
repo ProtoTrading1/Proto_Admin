@@ -2387,11 +2387,11 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
           <div className="adm-header-actions">
             <BridgeStatusDot />
             <LiveShoppersDot />
-            <button type="button" onClick={goHome} className="adm-btn-ghost"><Home size={15} /><span className="adm-btn-text">Home</span></button>
-            <button onClick={() => void refreshCurrentSection()} className="adm-btn-ghost"><RefreshCw size={15} /><span className="adm-btn-text">Refresh</span></button>
-            <button onClick={onViewPortal} className="adm-btn-ghost"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
+            <button type="button" onClick={goHome} className="adm-btn-ghost" aria-label="Home"><Home size={15} /><span className="adm-btn-text">Home</span></button>
+            <button onClick={() => void refreshCurrentSection()} className="adm-btn-ghost" aria-label="Refresh"><RefreshCw size={15} /><span className="adm-btn-text">Refresh</span></button>
+            <button onClick={onViewPortal} className="adm-btn-ghost" aria-label="Portal"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
             {onSignOut && (
-              <button type="button" onClick={onSignOut} className="adm-btn-ghost" title={customer?.email || 'Sign out'}>
+              <button type="button" onClick={onSignOut} className="adm-btn-ghost" title={customer?.email || 'Sign out'} aria-label="Sign out">
                 <Lock size={15} /><span className="adm-btn-text">Sign out</span>
               </button>
             )}
