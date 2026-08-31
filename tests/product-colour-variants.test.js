@@ -39,6 +39,37 @@ describe('Product Loader colour variants', () => {
     });
   });
 
+  it.each([
+    ['8630330014-DPNK.jpg', '8630330014', 'DPNK', 'Dark Pink'],
+    ['8630330014-DRED.jpg', '8630330014', 'DRED', 'Dark Red'],
+    ['8630330014-LPNK.jpg', '8630330014', 'LPNK', 'Light Pink'],
+    ['8630330014-LRED.jpg', '8630330014', 'LRED', 'Light Red'],
+    ['8630330015-LPUR.jpg', '8630330015', 'LPUR', 'Light Purple'],
+  ])('preserves the supplied colour suffix in %s', (filename, positillCode, variantCode, variantLabel) => {
+    expect(parseColourVariantFilename(filename)).toMatchObject({
+      positillCode,
+      variantCode,
+      variantLabel,
+      variantSku: `${positillCode}-${variantCode}`,
+    });
+  });
+
+  it('keeps duplicate images on independent slots for one supplied colour SKU', () => {
+    const rows = [
+      '8630330015-PNK.jpg',
+      '8630330015-PNK (2).jpg',
+    ].map((filename) => ({
+      filename,
+      colourVariant: parseColourVariantFilename(filename),
+    }));
+
+    const assigned = assignColourVariantImageSlots(rows);
+    expect(assigned.map((row) => [row.colourVariant.variantSku, row.assignedImageSlot])).toEqual([
+      ['8630330015-PNK', 1],
+      ['8630330015-PNK', 2],
+    ]);
+  });
+
   it('allocates independent 1-4 galleries for each colour', () => {
     const rows = [
       '8621000002-WHT.jpg',

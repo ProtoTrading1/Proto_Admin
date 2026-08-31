@@ -119,6 +119,7 @@ import PlacementsEditor from '../components/PlacementsEditor';
 import AdminSelect from '../components/AdminSelect';
 import ComingSoonPanel from '../components/ComingSoonPanel';
 import OrderEmailNotify from '../components/OrderEmailNotify';
+import DeliveryLabelCopy from '../components/DeliveryLabelCopy.jsx';
 import ProductManagerEngine from '../components/ProductManagerEngine';
 import GroupedSidebar, { NAV_GROUPS } from '../components/GroupedSidebar';
 import { useDashboardStats } from '../hooks/useDashboardStats';
@@ -1344,7 +1345,8 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
         body: JSON.stringify({
           orderId: order.id,
           to: email,
-          customerName: order.customers?.name,
+          customerName: order.customers?.contact_name || order.customers?.name,
+          companyName: order.customers?.business_name,
           orderNumber: displayOrderNumber(order),
           orderDate: order.created_at,
           items: customerItems,
@@ -1495,7 +1497,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
       clearInterval(timer);
       window.removeEventListener('focus', refresh);
     };
-  }, [activeSection]);
+    // Refresh the selected query, not the initial New-tab closure. Otherwise
+    // a focus/timer request can supersede All orders and strand its loading key.
+  }, [activeSection, orderTab, orderPage, orderPageSize, orderSearchDebounced]);
 
   // Remember the expanded order's row while it is present in the list, and
   // unpin the moment it reappears (e.g. the admin switched to the tab it
@@ -2386,11 +2390,11 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
           <div className="adm-header-actions">
             <BridgeStatusDot />
             <LiveShoppersDot />
-            <button type="button" onClick={goHome} className="adm-btn-ghost"><Home size={15} /><span className="adm-btn-text">Home</span></button>
-            <button onClick={() => void refreshCurrentSection()} className="adm-btn-ghost"><RefreshCw size={15} /><span className="adm-btn-text">Refresh</span></button>
-            <button onClick={onViewPortal} className="adm-btn-ghost"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
+            <button type="button" onClick={goHome} className="adm-btn-ghost" aria-label="Home"><Home size={15} /><span className="adm-btn-text">Home</span></button>
+            <button onClick={() => void refreshCurrentSection()} className="adm-btn-ghost" aria-label="Refresh"><RefreshCw size={15} /><span className="adm-btn-text">Refresh</span></button>
+            <button onClick={onViewPortal} className="adm-btn-ghost" aria-label="Portal"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
             {onSignOut && (
-              <button type="button" onClick={onSignOut} className="adm-btn-ghost" title={customer?.email || 'Sign out'}>
+              <button type="button" onClick={onSignOut} className="adm-btn-ghost" title={customer?.email || 'Sign out'} aria-label="Sign out">
                 <Lock size={15} /><span className="adm-btn-text">Sign out</span>
               </button>
             )}
@@ -3040,6 +3044,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                           </div>
                           <div data-label="Customer">
                             <div style={{ fontWeight: 600, fontSize: 13 }}>{order.customers?.name || 'Unknown'}</div>
+                            {order.customers?.business_name && (
+                              <div style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>{order.customers.business_name}</div>
+                            )}
                             <div className="adm-muted" style={{ fontSize: 11 }}>{order.customers?.email || ''}</div>
                           </div>
                           <div data-label="Date">
@@ -3132,6 +3139,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                               ))}
                             </div>
                             <OrderEmailNotify orderId={order.id} orderStatus={normalizeOrderStatus(order.status)} />
+                            <DeliveryLabelCopy customer={order.customers} />
                             {(() => {
                               const promo = orderPromo(order);
                               if (!promo) return null;

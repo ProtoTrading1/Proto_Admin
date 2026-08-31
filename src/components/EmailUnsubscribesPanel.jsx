@@ -17,12 +17,6 @@ function formatWhen(value) {
   });
 }
 
-function sourceLabel(value) {
-  const raw = String(value || '').trim();
-  if (raw === 'email_unsubscribe_link') return 'Email link';
-  return raw || '-';
-}
-
 export default function EmailUnsubscribesPanel({ onShowToast }) {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -108,7 +102,7 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
             <UserX size={17} /> Unsubscribed
           </h3>
           <p className="adm-section-note" style={{ margin: '4px 0 0' }}>
-            Contacts who opted out of backend marketing broadcasts.
+            All contacts on Brevo's marketing suppression list, merged with Proto's signed unsubscribe records.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -127,15 +121,15 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
       </div>
 
       <div className="adm-list">
-        <div className="adm-list-head" style={{ gridTemplateColumns: '1.5fr 150px 180px 180px' }}>
-          <span>Email</span><span>Source</span><span>Unsubscribed</span><span>Created</span>
+        <div className="adm-list-head" style={{ gridTemplateColumns: '1.2fr 1fr 1.4fr 180px' }}>
+          <span>Business</span><span>Contact</span><span>Email</span><span>Unsubscribed</span>
         </div>
         {rows.map((row) => (
-          <div key={`${row.email}-${row.unsubscribed_at || row.created_at}`} className="adm-list-row" style={{ gridTemplateColumns: '1.5fr 150px 180px 180px' }}>
-            <div data-label="Email" style={{ fontSize: 13, fontWeight: 600, wordBreak: 'break-all' }}>{row.email}</div>
-            <div data-label="Source" className="adm-muted" style={{ fontSize: 12 }}>{sourceLabel(row.source)}</div>
+          <div key={`${row.email}-${row.unsubscribed_at || row.created_at}`} className="adm-list-row" style={{ gridTemplateColumns: '1.2fr 1fr 1.4fr 180px' }}>
+            <div data-label="Business" style={{ fontSize: 13, fontWeight: 600 }}>{row.business_name || '-'}</div>
+            <div data-label="Contact" style={{ fontSize: 13 }}>{row.contact_name || '-'}</div>
+            <div data-label="Email" style={{ fontSize: 12, wordBreak: 'break-all' }}>{row.email}</div>
             <div data-label="Unsubscribed" className="adm-muted" style={{ fontSize: 12 }}>{formatWhen(row.unsubscribed_at)}</div>
-            <div data-label="Created" className="adm-muted" style={{ fontSize: 12 }}>{formatWhen(row.created_at)}</div>
           </div>
         ))}
         {!loading && rows.length === 0 && (

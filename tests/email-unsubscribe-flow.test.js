@@ -47,6 +47,20 @@ describe('marketing unsubscribe flow', () => {
     expect(verifyUnsubscribeToken('other@example.co.za', buildUnsubscribeToken('jane@example.co.za'))).toBe(false);
   });
 
+  it('automatically adds a signed unsubscribe link to every composed marketing email', () => {
+    vi.stubEnv('MARKETING_UNSUBSCRIBE_SECRET', 'test-secret');
+    const vars = buildRecipientVars({ email: 'Jane@Example.co.za', first_name: 'Jane' });
+    const email = buildComposedEmail({
+      subject: 'Proto update',
+      introText: 'Hello Jane',
+      htmlBlock: '<p>New products are available.</p>',
+    }, vars);
+
+    expect(email.htmlContent).toContain('Unsubscribe from Proto marketing emails');
+    expect(email.htmlContent).toContain('https://admin.proto.co.za/api/email-unsubscribe?e=');
+    expect(email.textContent).toContain('unsubscribe here: https://admin.proto.co.za/api/email-unsubscribe?e=');
+  });
+
   it('filters opted-out contacts before Brevo receives the broadcast audience', async () => {
     const sb = fakeSupabase({
       customers: [
@@ -67,12 +81,17 @@ describe('marketing unsubscribe flow', () => {
   it('ships a database-backed suppression list and public opt-out endpoint', () => {
     const migration = fs.readFileSync(new URL('../migrations/064_marketing_email_opt_outs.sql', import.meta.url), 'utf8');
     const endpoint = fs.readFileSync(new URL('../api/email-unsubscribe.js', import.meta.url), 'utf8');
+    const emailService = fs.readFileSync(new URL('../api/_brevo-email.js', import.meta.url), 'utf8');
+    const brevoSuppression = fs.readFileSync(new URL('../api/_brevo-suppression.js', import.meta.url), 'utf8');
     const previewMergeTags = fs.readFileSync(new URL('../src/lib/emailMergeTags.js', import.meta.url), 'utf8');
 
     expect(migration).toMatch(/create table if not exists public\.marketing_email_opt_outs/);
     expect(migration).toMatch(/grant all on table public\.marketing_email_opt_outs to service_role/);
     expect(endpoint).toContain("from('marketing_email_opt_outs').upsert");
     expect(endpoint).toContain('verifyUnsubscribeToken');
+    expect(endpoint).toContain('suppressBrevoContact');
+    expect(emailService).toContain('Marketing unsubscribe protection is unavailable');
+    expect(brevoSuppression).toContain('emailBlacklisted: true');
     expect(previewMergeTags).toContain("key: 'unsubscribe'");
     expect(previewMergeTags).toContain("key: 'unsubscribe_url'");
   });

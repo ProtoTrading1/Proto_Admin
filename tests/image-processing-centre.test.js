@@ -8,6 +8,7 @@ import {
   fetchImageProcessingJobs,
   multiSkuMappingsFromFilename,
   normalizeImageProcessingJob,
+  splitImageArchiveJobs,
   summarizeImageProcessingJobs,
   updateImageProcessingJob,
 } from '../src/lib/imageProcessingJobs.js';
@@ -69,6 +70,44 @@ describe('Image Processing Centre API adapter', () => {
       status: 'review',
       displayed_asset_id: 'ipc_asset_123',
     })).toMatchObject({ displayedAssetId: 'ipc_asset_123' });
+  });
+
+  it('retains the server archive timestamp used to classify legacy records', () => {
+    expect(normalizeImageProcessingJob({
+      id: 'archived-1',
+      status: 'archived',
+      archived_at: '2026-08-27T07:30:00.000Z',
+    })).toMatchObject({ archivedAt: '2026-08-27T07:30:00.000Z' });
+  });
+
+  it('separates images archived today from the older archive in Johannesburg time', () => {
+    const { newlyArchivedJobs, olderArchiveJobs } = splitImageArchiveJobs([
+      {
+        id: 'new-direct',
+        archivedAt: '2026-08-27T08:00:00.000Z',
+      },
+      {
+        id: 'new-after-midnight-local',
+        archive: { destinationSnapshot: { capturedAt: '2026-08-26T22:30:00.000Z' } },
+      },
+      {
+        id: 'old-before-midnight-local',
+        archive: { destinationSnapshot: { capturedAt: '2026-08-26T20:00:00.000Z' } },
+      },
+      { id: 'legacy-without-archive-time', createdAt: '2026-08-27T09:00:00.000Z' },
+    ], new Date('2026-08-27T10:00:00.000Z'));
+
+    expect(newlyArchivedJobs.map((job) => job.id)).toEqual(['new-direct', 'new-after-midnight-local']);
+    expect(olderArchiveJobs.map((job) => job.id)).toEqual(['legacy-without-archive-time', 'old-before-midnight-local']);
+  });
+
+  it('keeps Image Processing history as one operational list with visible selection', () => {
+    expect(centreSource).not.toContain('Newly archived today');
+    expect(centreSource).not.toContain('Images Catherine has just saved');
+    expect(centreSource).not.toContain('ipc-archive-groups');
+    expect(centreSource).toContain('aria-pressed={selected}');
+    expect(centreSource).toContain("const visibleJobs = queueView === 'archive'");
+    expect(centreSource).toContain('? archivedJobs : queuedJobs');
   });
 
   it('creates Nutstore batches through the flat collection endpoint', async () => {

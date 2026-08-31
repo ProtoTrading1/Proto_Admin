@@ -165,6 +165,11 @@ function pdfSafeText(value) {
     .replace(/…/g, '...');
 }
 
+/** Uppercase customer identity/address lines for copy-paste shipping labels. */
+export function uppercasePdfCustomerDetails(lines = []) {
+  return lines.map((line) => String(line ?? '').toLocaleUpperCase('en-ZA'));
+}
+
 function detectImageFormat(dataUrl) {
   if (!dataUrl) return 'JPEG';
   if (dataUrl.includes('image/png')) return 'PNG';
@@ -239,8 +244,8 @@ export async function generateOrderPdfBase64({
   });
   const linkUrl = includeInternalLink ? (fulfillmentUrl || buildFulfillmentUrl(order?.id)) : '';
   const shippingMethod = pdfShippingMethod(order);
-  const invoiceLines = invoiceToLines(order);
-  const deliverLines = deliveryAddressLines(order);
+  const invoiceLines = uppercasePdfCustomerDetails(invoiceToLines(order));
+  const deliverLines = uppercasePdfCustomerDetails(deliveryAddressLines(order));
 
   // ── Header band — Proto Trading Online ──────────────────────────────────
   doc.setFillColor(196, 0, 0);
@@ -326,10 +331,7 @@ export async function generateOrderPdfBase64({
   };
 
   const blockStartY = y;
-  // The block heading was already uppercased by drawAddressBlock; it is the
-  // billing party itself that has to read as all caps on the printed invoice.
-  const invoiceLinesCaps = invoiceLines.map((line) => String(line ?? '').toUpperCase());
-  const leftEnd = drawAddressBlock('Invoice To', invoiceLinesCaps, margin, blockStartY);
+  const leftEnd = drawAddressBlock('Invoice To', invoiceLines, margin, blockStartY);
   const rightEnd = drawAddressBlock('Delivery Address', deliverLines, rightX, blockStartY);
   y = Math.max(leftEnd, rightEnd) + 14;
 

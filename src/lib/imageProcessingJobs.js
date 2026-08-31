@@ -102,6 +102,37 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function johannesburgDateKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+export function imageArchiveTimestamp(job = {}) {
+  return job.archivedAt
+    || job.archived_at
+    || job.archive?.destinationSnapshot?.capturedAt
+    || '';
+}
+
+export function splitImageArchiveJobs(jobs, now = new Date()) {
+  const today = johannesburgDateKey(now);
+  const ordered = asArray(jobs).slice().sort((a, b) => {
+    const aTime = imageArchiveTimestamp(a) || a.updatedAt || a.createdAt || '';
+    const bTime = imageArchiveTimestamp(b) || b.updatedAt || b.createdAt || '';
+    return String(bTime).localeCompare(String(aTime));
+  });
+  return {
+    newlyArchivedJobs: ordered.filter((job) => johannesburgDateKey(imageArchiveTimestamp(job)) === today),
+    olderArchiveJobs: ordered.filter((job) => johannesburgDateKey(imageArchiveTimestamp(job)) !== today),
+  };
+}
+
 async function requestImageJobs(url, options = {}) {
   const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
   const controller = new AbortController();
@@ -158,6 +189,8 @@ export function normalizeImageProcessingJob(job = {}) {
     displayedAssetId: job.displayed_asset_id || job.displayedAssetId || '',
     error: job.error || job.error_message || '',
     createdAt: job.created_at || job.createdAt || '',
+    updatedAt: job.updated_at || job.updatedAt || '',
+    archivedAt: imageArchiveTimestamp(job),
     skuMappings,
     multiSkuSource: skuMappings.length > 1,
     treatment: String(treatment || '').trim().toLowerCase(),

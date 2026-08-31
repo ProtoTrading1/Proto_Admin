@@ -8,8 +8,15 @@ const batch = fs.readFileSync(new URL('../api/_brevo-email.js', import.meta.url)
 describe('email campaign follow-up audiences', () => {
   it('saves successful recipient snapshots for future no-open follow-up lists', () => {
     expect(broadcast).toMatch(/recipientEmails:/);
+    expect(broadcast).toContain('const attemptedRecipientEmails = recipients');
+    expect(broadcast).toContain('failedRecipientEmails: [...failedRecipientEmails]');
     expect(broadcast).toMatch(/const failedRecipientEmails = new Set\(\(failedEmails \|\| \[\]\)\.filter\(Boolean\)\)/);
     expect(batch).toMatch(/const failedEmails = \[\];/);
+  });
+
+  it('stamps CRM contacts for group broadcasts using only successful recipients', () => {
+    expect(broadcast).toContain("markCrmContactsEmailed(sb, successfulRecipientEmails, subject, sentAt)");
+    expect(broadcast).toContain("import { markCustomersEmailed, markCrmContactsEmailed }");
   });
 
   it('provides the five recipient tabs and keeps bounced contacts out of follow-up', () => {
@@ -25,5 +32,12 @@ describe('email campaign follow-up audiences', () => {
     expect(analytics).toContain('Create follow-up email');
     expect(analytics).toMatch(/onCompose\?\.\(\{ audience: 'selected', recipients: active\.emails \}\)/);
     expect(analytics).not.toContain('sendCustomerEmailBroadcast');
+  });
+
+  it('explains the different CRM scopes to prevent source confusion', () => {
+    const comms = fs.readFileSync(new URL('../src/components/CommsPanel.jsx', import.meta.url), 'utf8');
+    expect(comms).toContain('Contacts = approved portal customers');
+    expect(comms).toContain('Groups = broader saved audiences');
+    expect(comms).toContain('Analytics = every logged campaign send');
   });
 });

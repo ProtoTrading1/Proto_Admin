@@ -9,8 +9,9 @@ describe('email unsubscribe admin tab', () => {
   it('exposes a protected API for marketing opt-outs', () => {
     expect(endpoint).toContain('requireAdminKey(req, res)');
     expect(endpoint).toContain("from('marketing_email_opt_outs')");
-    expect(endpoint).toContain("order('unsubscribed_at', { ascending: false })");
-    expect(endpoint).toContain("ilike('email'");
+    expect(endpoint).toContain('listBrevoSuppressedContacts');
+    expect(endpoint).toContain('suppressBrevoContact');
+    expect(endpoint).toContain('customersByEmail');
   });
 
   it('adds the unsubscribe tab inside Email CRM', () => {
@@ -23,7 +24,16 @@ describe('email unsubscribe admin tab', () => {
     expect(panel).toContain('/api/email-unsubscribes?');
     expect(panel).toContain('Search email');
     expect(panel).toContain('Unsubscribed');
+    expect(panel).toContain('Business');
+    expect(panel).toContain('Contact');
     expect(panel).not.toContain('Send now');
+  });
+
+  it('allows Catherine to unsubscribe a contact directly from Email CRM', () => {
+    expect(comms).toContain("fetch('/api/email-unsubscribes'");
+    expect(comms).toContain('unsubscribeContact(email)');
+    expect(comms).toContain('Stop marketing emails for this contact');
+    expect(comms).toContain('Unsubscribe</span>');
   });
 });
 

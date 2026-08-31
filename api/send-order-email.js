@@ -246,6 +246,7 @@ export default async function handler(req, res) {
     to,
     orderId,
     customerName,
+    companyName,
     orderNumber,
     orderDate,
     items = [],
@@ -316,7 +317,7 @@ export default async function handler(req, res) {
   const customerDetails = customerDetailRows({
     ...(orderRow || {}),
     delivery_method: orderRow?.delivery_method || bodyDeliveryMethod,
-    customers: orderRow?.customers || { name: customerName, email: to },
+    customers: orderRow?.customers || { name: customerName, business_name: companyName, email: to },
   });
 
   const html = buildEmailHtml({

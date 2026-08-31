@@ -15,6 +15,11 @@ const source = fs.readFileSync(new URL('../src/pages/AdminPage.jsx', import.meta
  * empty, so the rows never painted and only a manual refresh recovered them.
  */
 describe('orders list repaint', () => {
+  it('shows the customer business name when the order includes one', () => {
+    expect(source).toMatch(/order\.customers\?\.business_name/);
+    expect(source).toMatch(/order\.customers\.business_name/);
+  });
+
   it('compares against what is painted, not the captured state variable', () => {
     const block = source.slice(source.indexOf('const loadOrders'), source.indexOf('const loadOrders') + 3000);
     expect(block).toMatch(/const painted = paintedOrdersRef\.current;/);

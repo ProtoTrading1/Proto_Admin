@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
-import { BarChart2, ChevronLeft, Layers, ChevronRight, Loader2, Mail, RefreshCw, Search, Send, UserX, Users } from 'lucide-react';
+import { BarChart2, ChevronLeft, Layers, ChevronRight, Loader2, Mail, RefreshCw, Search, Send, UserMinus, UserX, Users } from 'lucide-react';
 import { ADMIN_REFRESH_EVENT } from '../lib/adminRefresh';
 import { lazyRetry } from '../lib/lazyRetry';
 import { BUSINESS_TYPES } from '../lib/businessTypes';
@@ -58,6 +58,7 @@ export default function CommsPanel({ onCompose, onShowToast }) {
   const [businessType, setBusinessType] = useState('');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
+  const [unsubscribingEmail, setUnsubscribingEmail] = useState('');
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search.trim()), 300);
@@ -118,6 +119,30 @@ export default function CommsPanel({ onCompose, onShowToast }) {
   };
   const clearSelection = () => setSelected(new Set());
 
+  const unsubscribeContact = async (email) => {
+    if (!email || !window.confirm(`Unsubscribe ${email} from Proto marketing emails?`)) return;
+    setUnsubscribingEmail(email);
+    try {
+      const res = await fetch('/api/email-unsubscribes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Could not unsubscribe this contact');
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+      onShowToast?.('Contact unsubscribed from Proto marketing emails');
+    } catch (err) {
+      onShowToast?.(err.message || 'Unsubscribe failed', 'error');
+    } finally {
+      setUnsubscribingEmail('');
+    }
+  };
+
   const emailSelected = () => {
     const recipients = [...selected];
     if (!recipients.length) return;
@@ -142,8 +167,8 @@ export default function CommsPanel({ onCompose, onShowToast }) {
         <div>
           <h2 className="adm-section-title">Email CRM</h2>
           <p className="adm-section-note">
-            Your approved site customers. Filter by business type, tick the ones you want, and send — or email a whole
-            audience. Contacts come straight from the portal, not Brevo.
+            Your approved portal customers. Filter by business type, tick the ones you want, and send — or email a
+            whole audience. Groups and campaign analytics can include imported or pre-registration contacts as well.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -156,6 +181,13 @@ export default function CommsPanel({ onCompose, onShowToast }) {
             Send email
           </button>
         </div>
+      </div>
+
+      <div className="crm-campaign-summary" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <strong>CRM scope</strong>
+        <span>Contacts = approved portal customers</span>
+        <span>Groups = broader saved audiences</span>
+        <span>Analytics = every logged campaign send</span>
       </div>
 
       <div className="adm-customer-tabs" style={{ marginBottom: 12 }}>
@@ -257,17 +289,17 @@ export default function CommsPanel({ onCompose, onShowToast }) {
           </div>
 
           <div className="adm-list">
-            <div className="adm-list-head" style={{ gridTemplateColumns: '36px 1.3fr 1fr 1.3fr 1fr 0.9fr 110px' }}>
+            <div className="adm-list-head" style={{ gridTemplateColumns: '36px 1.3fr 1fr 1.3fr 1fr 0.9fr 110px 128px' }}>
               <span>
                 <input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select all on this page" style={{ accentColor: '#dc2626' }} disabled={!pageEmails.length} />
               </span>
-              <span>Business</span><span>Contact</span><span>Email</span><span>Business type</span><span>Location</span><span>Last emailed</span>
+              <span>Business</span><span>Contact</span><span>Email</span><span>Business type</span><span>Location</span><span>Last emailed</span><span>Actions</span>
             </div>
             {rows.map((c) => {
               const email = contactEmail(c);
               const hasEmail = isSendableEmail(email);
               return (
-                <div key={c.id || email} className="adm-list-row" style={{ gridTemplateColumns: '36px 1.3fr 1fr 1.3fr 1fr 0.9fr 110px' }}>
+                <div key={c.id || email} className="adm-list-row" style={{ gridTemplateColumns: '36px 1.3fr 1fr 1.3fr 1fr 0.9fr 110px 128px' }}>
                   <span data-label="Select">
                     <input
                       type="checkbox"
@@ -284,6 +316,19 @@ export default function CommsPanel({ onCompose, onShowToast }) {
                   <div data-label="Type" className="adm-muted" style={{ fontSize: 12 }}>{c.business_type || '—'}</div>
                   <div data-label="Location" className="adm-muted" style={{ fontSize: 12 }}>{contactLocation(c)}</div>
                   <div data-label="Last emailed" className="adm-muted" style={{ fontSize: 12 }} title={c.last_email_type ? `Last: ${c.last_email_type}` : ''}>{formatWhen(c.last_email_at)}</div>
+                  <div data-label="Actions">
+                    <button
+                      type="button"
+                      className="adm-btn-ghost"
+                      style={{ padding: '5px 8px', fontSize: 12 }}
+                      disabled={!hasEmail || unsubscribingEmail === email}
+                      onClick={() => void unsubscribeContact(email)}
+                      title="Stop marketing emails for this contact"
+                    >
+                      {unsubscribingEmail === email ? <Loader2 size={13} className="spin" /> : <UserMinus size={13} />}
+                      <span style={{ marginLeft: 5 }}>Unsubscribe</span>
+                    </button>
+                  </div>
                 </div>
               );
             })}

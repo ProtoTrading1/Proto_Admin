@@ -170,7 +170,7 @@ export default async function handler(req, res) {
     // PARENT (so it picks up the title/description/category/barcode) but
     // publishes to its own sibling record (CODE-2, CODE-3…) so it never
     // overwrites the parent's image.
-    if (parsed.copyIndex > 1 && (match.websiteRow || match.sqlRow)) {
+    if (!colourVariant && parsed.copyIndex > 1 && (match.websiteRow || match.sqlRow)) {
       const siblingSku = siblingSkuForCopy(match.code, parsed.copyIndex);
       const warnings = (match.warnings || []).filter((w) => w !== 'image_exists');
       item = {

@@ -13,6 +13,7 @@ export function buildCatalogParams({
   sort,
   stockFilter,
   archivedSource,
+  archiveSection,
   prioritySkus = [],
   onlyInStock = false,
   toOrderOnly = false,
@@ -28,6 +29,7 @@ export function buildCatalogParams({
     sort: sort || (status === 'archived' ? 'archived' : 'updated'),
     stockFilter,
     archivedSource,
+    archiveSection,
     prioritySkus,
     onlyInStock,
     toOrderOnly,
@@ -45,6 +47,7 @@ async function fetchCatalog(params) {
   if (params.categoryPath?.length) qs.set('categoryPath', JSON.stringify(params.categoryPath));
   if (params.stockFilter) qs.set('stockFilter', params.stockFilter);
   if (params.archivedSource && params.archivedSource !== 'all') qs.set('archivedSource', params.archivedSource);
+  if (params.archiveSection) qs.set('archiveSection', params.archiveSection);
   if (params.prioritySkus?.length) qs.set('prioritySkus', JSON.stringify(params.prioritySkus));
   if (params.onlyInStock) qs.set('onlyInStock', 'true');
   if (params.toOrderOnly) qs.set('toOrderOnly', 'true');

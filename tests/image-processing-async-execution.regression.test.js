@@ -11,9 +11,11 @@ globalThis.React = React;
 const mocks = vi.hoisted(() => ({
   currentJob: null,
   claimImageObject: vi.fn(),
+  createPrivateSourceUrl: vi.fn(),
   releaseImageObjectClaim: vi.fn(),
   processImageWithFal: vi.fn(),
   persistJob: vi.fn(),
+  assertReviewAssetsAvailable: vi.fn(),
 }));
 
 vi.mock('../api/_admin-auth.js', () => ({
@@ -24,7 +26,7 @@ vi.mock('../api/_admin-auth.js', () => ({
 
 vi.mock('../api/_image-processing-store.js', () => ({
   claimImageObject: mocks.claimImageObject,
-  createPrivateSourceUrl: vi.fn(async () => '/original/ABC1.png'),
+  createPrivateSourceUrl: mocks.createPrivateSourceUrl,
   readImageJob: vi.fn(async () => mocks.currentJob),
   readImageJobIndex: vi.fn(async () => []),
   releaseImageObjectClaim: mocks.releaseImageObjectClaim,
@@ -32,6 +34,7 @@ vi.mock('../api/_image-processing-store.js', () => ({
 
 vi.mock('../api/_image-processing-service.js', () => ({
   estimatedImageCostUsd: vi.fn(() => 0.018),
+  assertReviewAssetsAvailable: mocks.assertReviewAssetsAvailable,
   ingestLocalSource: vi.fn(),
   ingestStagedSource: vi.fn(),
   markImageApproved: vi.fn(),
@@ -40,6 +43,7 @@ vi.mock('../api/_image-processing-service.js', () => ({
   publishApprovedImage: vi.fn(),
   rejectImage: vi.fn(),
   restorePublishedOriginal: vi.fn(),
+  targetedRepairAssetId: vi.fn(() => 'asset-test'),
 }));
 
 import handler from '../api/image-processing-jobs.js';
@@ -56,7 +60,8 @@ function imageJob(status = 'queued') {
       slot: 1,
       targetTable: 'website_stock',
       status,
-      source: { type: 'local_upload', filename: 'ABC1.png', privatePath: 'source/ABC1.png' },
+      source: { type: 'local_upload', filename: 'ABC1.png', privatePath: 'image-processing/sources/manifest-1/image-1.png' },
+      outputStoragePath: status === 'review' ? 'image-processing/sources/manifest-1/image-1-review.jpg' : null,
       processing: status === 'processing' ? { provider: 'fal.ai', claimId: 'start-claim' } : null,
     }],
   };
@@ -89,6 +94,8 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
     mocks.currentJob = imageJob('queued');
     mocks.claimImageObject.mockResolvedValue({ id: 'claim-1' });
     mocks.releaseImageObjectClaim.mockResolvedValue(true);
+    mocks.createPrivateSourceUrl.mockResolvedValue('/signed/ABC1.png');
+    mocks.assertReviewAssetsAvailable.mockResolvedValue(undefined);
     mocks.persistJob.mockImplementation(async (job) => {
       mocks.currentJob = structuredClone(job);
       return mocks.currentJob;
@@ -97,6 +104,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
       ...image,
       status: 'review',
       reviewUrl: '/processed/ABC1.png',
+      outputStoragePath: 'image-processing/sources/manifest-1/image-1-review.jpg',
     }));
   });
 
@@ -126,6 +134,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
       ...image,
       status: 'review',
       reviewUrl: '/processed/ABC1.png',
+      outputStoragePath: 'image-processing/sources/manifest-1/image-1-review.jpg',
     }));
 
     const firstRes = response();
@@ -136,7 +145,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
 
     expect.soft(mocks.processImageWithFal).toHaveBeenCalledTimes(1);
     expect.soft(firstRes.statusCode).toBe(200);
-    expect.soft(firstRes.body?.job).toMatchObject({ status: 'review', after_url: '/processed/ABC1.png' });
+    expect.soft(firstRes.body?.job).toMatchObject({ status: 'review', after_url: '/signed/ABC1.png' });
     expect.soft([202, 409]).toContain(secondRes.statusCode);
     expect.soft(mocks.releaseImageObjectClaim).toHaveBeenCalled();
   });
@@ -155,7 +164,7 @@ describe('Image Processing Centre asynchronous fal execution contract', () => {
     await handler(request('execute'), res);
 
     expect.soft(res.statusCode).toBe(200);
-    expect.soft(res.body?.job).toMatchObject({ status: 'review', after_url: '/processed/ABC1.png' });
+    expect.soft(res.body?.job).toMatchObject({ status: 'review', after_url: '/signed/ABC1.png' });
     expect.soft(mocks.processImageWithFal).toHaveBeenCalledTimes(1);
     expect.soft(mocks.persistJob.mock.calls.some(([saved]) => (
       saved.images[0].processing?.claimId === 'legacy-recovery-claim'

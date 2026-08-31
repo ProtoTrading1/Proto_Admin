@@ -152,6 +152,10 @@ function treatmentVerificationCopy(job) {
   return 'The manual repair changed only the intended area; the real product, branding and proportions remain unchanged.';
 }
 
+function hasRequiredReviewPreviews(job) {
+  return Boolean(job?.beforeUrl && job?.afterUrl);
+}
+
 function ImageLightbox({ label, url, onClose }) {
   useEffect(() => {
     const closeOnEscape = (event) => {
@@ -172,6 +176,16 @@ function ImageLightbox({ label, url, onClose }) {
         <img src={url} alt={`${label} full-size product`} />
       </div>
     </div>
+  );
+}
+
+function ImageQueueRow({ job, selected, onSelect }) {
+  return (
+    <button type="button" aria-pressed={selected} className={`ipc-queue-row${selected ? ' ipc-queue-row--on' : ''}`} onClick={() => onSelect(job.id)}>
+      <span className={`ipc-status-dot ipc-status-dot--${job.status}`} />
+      <span className="ipc-queue-copy"><strong title={job.filename}>{job.filename}</strong><small>{job.sku || (job.source === 'nutstore' ? 'Nutstore' : 'Local upload')}</small></span>
+      <span className={`ipc-status ipc-status--${job.status}`}>{statusLabel(job.status)}</span>
+    </button>
   );
 }
 
@@ -316,6 +330,7 @@ export default function ImageProcessingCentre({
   const queueMutationVersionRef = useRef(0);
   const lastQueueMutationAtRef = useRef(0);
   const queueLoadSequenceRef = useRef(0);
+  const recentlyQueuedJobIdsRef = useRef(new Set());
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [workerUnavailable, setWorkerUnavailable] = useState(false);
@@ -341,14 +356,14 @@ export default function ImageProcessingCentre({
   const [repairConfirmation, setRepairConfirmation] = useState(false);
 
   const summary = useMemo(() => summarizeImageProcessingJobs(jobs), [jobs]);
-  const selectedJob = jobs.find((job) => job.id === selectedJobId) || jobs[0] || null;
-  const selectedJobExecutionAuthorized = selectedJob
-    ? executionAuthorizationRef.current.has(selectedJob.id)
-    : false;
   const hasActiveJobs = jobs.some((job) => ACTIVE_STATUSES.has(job.status));
   const archivedJobs = jobs.filter((job) => ['archived', 'published', 'restored'].includes(job.status));
   const queuedJobs = jobs.filter((job) => !['archived', 'published', 'restored'].includes(job.status));
   const visibleJobs = queueView === 'archive' ? archivedJobs : queuedJobs;
+  const selectedJob = visibleJobs.find((job) => job.id === selectedJobId) || visibleJobs[0] || null;
+  const selectedJobExecutionAuthorized = selectedJob
+    ? executionAuthorizationRef.current.has(selectedJob.id)
+    : false;
   const workflowStep = selectedJob
     ? (['review', 'ready', 'completed'].includes(selectedJob.status)
       ? 3
@@ -373,6 +388,7 @@ export default function ImageProcessingCentre({
     && selectedReviewChecklist.cleanEdgesBackground
     && (!treatmentVerificationRequired || selectedReviewChecklist.treatmentVerified)
   );
+  const reviewPreviewsAvailable = hasRequiredReviewPreviews(selectedJob);
   const selectedRepairDraft = repairDraft?.jobId === selectedJob?.id ? repairDraft : null;
   const repairAreaRatio = selectedRepairDraft
     ? (selectedRepairDraft.selection.width * selectedRepairDraft.selection.height)
@@ -385,6 +401,7 @@ export default function ImageProcessingCentre({
     && repairAreaRatio > 0
     && repairAreaRatio <= 0.35
   );
+
   const processingOptions = useMemo(() => ({
     treatment: processingPreset,
     manualSafeCutout,
@@ -494,9 +511,19 @@ export default function ImageProcessingCentre({
       setJobs((current) => {
         const hasLocallyActiveJob = current.some((job) => ACTIVE_STATUSES.has(job.status));
         const mutationIsRecent = Date.now() - lastQueueMutationAtRef.current < 30_000;
+        const receivedIds = new Set(rows.map((job) => job.id));
+        for (const id of receivedIds) recentlyQueuedJobIdsRef.current.delete(id);
+        const missingRecentlyQueued = current.filter((job) => (
+          recentlyQueuedJobIdsRef.current.has(job.id) && !receivedIds.has(job.id)
+        ));
         // Do not let a briefly stale index erase work that this tab just
         // created. The durable backend listing remains authoritative after the
         // short consistency window.
+        if (mutationIsRecent && missingRecentlyQueued.length) {
+          const byId = new Map(current.map((job) => [job.id, job]));
+          for (const job of rows) byId.set(job.id, { ...byId.get(job.id), ...job });
+          return [...byId.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+        }
         if (!rows.length && hasLocallyActiveJob && mutationIsRecent) return current;
         if (mutationIsRecent && hasLocallyActiveJob) {
           const byId = new Map(current.map((job) => [job.id, job]));
@@ -555,6 +582,7 @@ export default function ImageProcessingCentre({
       const created = await createNutstoreImageJobs(nutstoreSelection, processingOptions);
       if (!created.length) throw new Error('Nutstore returned no image queue items. Please try Add selected again.');
       markQueueMutation();
+      for (const job of created) recentlyQueuedJobIdsRef.current.add(job.id);
       if (intakeCanStart) authorizeExecution(created);
       mergeJobs(created);
       setQueueView('queue');
@@ -589,6 +617,7 @@ export default function ImageProcessingCentre({
       const created = await createUploadedImageJobs(files, processingOptions);
       if (!created.length) throw new Error('No image queue items were created. Please try adding the images again.');
       markQueueMutation();
+      for (const job of created) recentlyQueuedJobIdsRef.current.add(job.id);
       if (intakeCanStart) authorizeExecution(created);
       mergeJobs(created);
       setQueueView('queue');
@@ -667,7 +696,7 @@ export default function ImageProcessingCentre({
   };
 
   const approveSelectedJob = async () => {
-    if (!selectedJob || !reviewChecklistComplete) return;
+    if (!selectedJob || !reviewPreviewsAvailable || !reviewChecklistComplete) return;
     await runAction(selectedJob, 'approve', {
       reviewChecklist: {
         correctSku: selectedReviewChecklist.correctSku === true,
@@ -1010,12 +1039,12 @@ export default function ImageProcessingCentre({
               <strong>Loading private image queue</strong>
               <span>Checking staged uploads, review items and archive records. Nothing is applied to Product Manager during this load.</span>
             </div>
-          ) : visibleJobs.length ? visibleJobs.map((job) => (
-            <button key={job.id} type="button" className={`ipc-queue-row${selectedJob?.id === job.id ? ' ipc-queue-row--on' : ''}`} onClick={() => setSelectedJobId(job.id)}>
-              <span className={`ipc-status-dot ipc-status-dot--${job.status}`} />
-              <span className="ipc-queue-copy"><strong title={job.filename}>{job.filename}</strong><small>{job.sku || (job.source === 'nutstore' ? 'Nutstore' : 'Local upload')}</small></span>
-              <span className={`ipc-status ipc-status--${job.status}`}>{statusLabel(job.status)}</span>
-            </button>
+          ) : queueView === 'archive' && archivedJobs.length ? (
+            archivedJobs.map((job) => (
+              <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
+            ))
+          ) : queueView === 'queue' && queuedJobs.length ? queuedJobs.map((job) => (
+            <ImageQueueRow key={job.id} job={job} selected={selectedJob?.id === job.id} onSelect={setSelectedJobId} />
           )) : (
             <div className="ipc-empty">{queueView === 'archive' ? <Archive size={22} /> : <Sparkles size={22} />}<strong>{queueView === 'archive' ? 'No archived images yet' : 'No images queued'}</strong><span>{queueView === 'archive' ? 'Reviewed results saved here stay private and separate from processing assets.' : 'Add selected Nutstore images or upload a folder to begin.'}</span><small>{queueView === 'archive' ? 'Archive is private until you explicitly apply an approved image.' : 'Choose a treatment above, then add your first image to start.'}</small></div>
           )}
@@ -1060,6 +1089,9 @@ export default function ImageProcessingCentre({
                   }}
                 />
               </div>
+              {REVIEW_STATUSES.has(selectedJob.status) && !reviewPreviewsAvailable && (
+                <p className="ipc-job-error" role="alert"><AlertTriangle size={14} /> Review incomplete: the retained original or website-ready preview is unavailable. Approval is blocked. Refresh the queue or process the image again.</p>
+              )}
               {REVIEW_STATUSES.has(selectedJob.status) && selectedJob.afterUrl && selectedJob.displayedAssetId && (
                 <div className="ipc-targeted-repair">
                   {repairModeJobId === selectedJob.id ? (
@@ -1112,7 +1144,7 @@ export default function ImageProcessingCentre({
               {selectedJob.error && <p className="ipc-job-error"><AlertTriangle size={14} /> {selectedJob.error}</p>}
               <div className="ipc-review-actions">
                 {REVIEW_STATUSES.has(selectedJob.status) && <>
-                  <button type="button" className="adm-btn-red" disabled={Boolean(busy) || selectedJob.qualityScore == null || blockingQualityFlags.length > 0 || !reviewChecklistComplete} onClick={() => void approveSelectedJob()}><Check size={14} /> Approve result</button>
+                  <button type="button" className="adm-btn-red" disabled={Boolean(busy) || !reviewPreviewsAvailable || selectedJob.qualityScore == null || blockingQualityFlags.length > 0 || !reviewChecklistComplete} onClick={() => void approveSelectedJob()}><Check size={14} /> Approve result</button>
                   <button type="button" className="adm-btn-ghost" disabled={Boolean(busy)} onClick={() => void runConfirmedQueueAction(selectedJob, 'reject')}><X size={14} /> Reject</button>
                   <button type="button" className="adm-btn-ghost" disabled={Boolean(busy)} onClick={() => void runConfirmedQueueAction(selectedJob, 'retry')}><RotateCcw size={14} /> Process again</button>
                 </>}

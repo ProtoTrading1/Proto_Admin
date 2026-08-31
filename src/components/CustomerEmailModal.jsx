@@ -325,6 +325,8 @@ export default function CustomerEmailModal({
     }
   };
 
+  const isSelectedAudience = audience === 'selected';
+
 
   const handleSend = async (test = false) => {
     if (!subject.trim()) {
@@ -761,6 +763,15 @@ export default function CustomerEmailModal({
               </button>
             </>
           )}
+        </div>
+
+        <div className="adm-email-send-summary" role="status" aria-live="polite">
+          <div>
+            <span className="adm-email-send-summary__label">Ready to send to</span>
+            <strong>{isSelectedAudience ? `${selectedEmails.length} specific ${selectedEmails.length === 1 ? 'person' : 'people'}` : selectedAudience?.label || 'the selected audience'}</strong>
+          </div>
+          {!isSelectedAudience && businessTypes.length > 0 && <span>{businessTypes.length} business-type filter{businessTypes.length === 1 ? '' : 's'} active</span>}
+          <span className="adm-email-send-summary__hint">You’ll get one final confirmation before anything is sent.</span>
         </div>
 
         <div className="adm-modal-footer adm-modal-footer--end adm-email-modal__footer">

@@ -508,6 +508,7 @@ export default function ProductManagerEngine({
   );
   const [status, setStatus] = useState(() => clampStatus(initialStatus));
   const [archiveStockView, setArchiveStockView] = useState('archived');
+  const [archiveSection, setArchiveSection] = useState('new-images');
   const [archiveSourceFilter, setArchiveSourceFilter] = useState('all');
   const [archivePrioritySkus, setArchivePrioritySkus] = useState(() => (
     initialStatus === 'archived' ? readArchivePrioritySkus() : []
@@ -605,7 +606,7 @@ export default function ProductManagerEngine({
     selectedRowsRef.current = new Map();
     lastSelectIdxRef.current = null;
     setSelectAllView(false);
-  }, [status, debouncedSearch, categoryPath.join('/'), archiveStockView, archiveSourceFilter, onlyInStock, toOrderOnly]);
+  }, [status, debouncedSearch, categoryPath.join('/'), archiveStockView, archiveSection, archiveSourceFilter, onlyInStock, toOrderOnly]);
 
   // Any catalogue mutation (single-row or bulk archive/restore/delete/make-live)
   // changes category membership — refresh BOTH badge sources so the sidebar
@@ -670,10 +671,11 @@ export default function ProductManagerEngine({
     categoryPath: debouncedSearch ? [] : categoryPath,
     stockFilter: status === 'archived' ? archiveStockView : undefined,
     archivedSource: status === 'archived' && archiveStockView === 'archived' ? archiveSourceFilter : undefined,
+    archiveSection: status === 'archived' && archiveStockView === 'archived' ? archiveSection : undefined,
     prioritySkus: status === 'archived' && archiveStockView === 'archived' ? archivePrioritySkus : [],
     onlyInStock: status === 'live' && onlyInStock,
     toOrderOnly: status === 'live' && toOrderOnly,
-  }), [status, page, pageSize, debouncedSearch, categoryPath, archiveStockView, archiveSourceFilter, archivePrioritySkus, onlyInStock, toOrderOnly]);
+  }), [status, page, pageSize, debouncedSearch, categoryPath, archiveStockView, archiveSection, archiveSourceFilter, archivePrioritySkus, onlyInStock, toOrderOnly]);
 
   const { data, isLoading, isFetching, isPlaceholderData } = useCatalogQuery(catalogParams);
   const rowsStale = Boolean(data && data.page !== page);
@@ -1253,6 +1255,7 @@ export default function ProductManagerEngine({
         categoryPath: debouncedSearch ? [] : categoryPath,
         stockFilter: status === 'archived' ? archiveStockView : undefined,
         archivedSource: status === 'archived' && archiveStockView === 'archived' ? archiveSourceFilter : undefined,
+        archiveSection: status === 'archived' && archiveStockView === 'archived' ? archiveSection : undefined,
         onlyInStock: status === 'live' && onlyInStock,
       });
       // Products that are in this category only via an additional placement
@@ -1630,24 +1633,36 @@ export default function ProductManagerEngine({
                   <p className="adm-section-note" style={{ margin: '0 0 8px', width: '100%' }}>
                     {archiveStockView === 'negative'
                       ? 'Live products with negative ERP stock. Zero-stock items are not shown here.'
-                      : `Archived products hidden from the trade website. ${data?.pinnedBatchCount ? `${data.pinnedBatchCount} ${data.pinnedBatchCount === 1 ? 'product is' : 'products are'} pinned first from the latest Excel batch; then ` : ''}most recently archived items appear next; zero-stock items are not shown here.`}
+                      : archiveSection === 'new-images'
+                        ? 'Products sent to Archive from Product Loader. They stay here until Make live is confirmed.'
+                        : 'Previously archived products. Product Loader image items are kept in the separate New image items view.'}
                   </p>
                   <div className="pm-archive-stock-toggle" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: '100%', marginBottom: 8 }}>
                     <button
                       type="button"
-                      className={`adm-btn-ghost adm-btn--sm${archiveStockView === 'archived' ? ' adm-tab--active' : ''}`}
-                      onClick={() => setArchiveStockView('archived')}
+                      aria-pressed={archiveStockView === 'archived' && archiveSection === 'new-images'}
+                      className={`adm-btn-ghost adm-btn--sm${archiveStockView === 'archived' && archiveSection === 'new-images' ? ' adm-tab--active' : ''}`}
+                      onClick={() => { setArchiveStockView('archived'); setArchiveSection('new-images'); setArchiveSourceFilter('all'); }}
                     >
-                      Archived
+                      New image items
                     </button>
                     <button
                       type="button"
+                      aria-pressed={archiveStockView === 'archived' && archiveSection === 'older'}
+                      className={`adm-btn-ghost adm-btn--sm${archiveStockView === 'archived' && archiveSection === 'older' ? ' adm-tab--active' : ''}`}
+                      onClick={() => { setArchiveStockView('archived'); setArchiveSection('older'); }}
+                    >
+                      Older archive
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={archiveStockView === 'negative'}
                       className={`adm-btn-ghost adm-btn--sm${archiveStockView === 'negative' ? ' adm-tab--active' : ''}`}
                       onClick={() => setArchiveStockView('negative')}
                     >
                       Negative stock
                     </button>
-                    {archiveStockView === 'archived' && (
+                    {archiveStockView === 'archived' && archiveSection === 'older' && (
                       <>
                         <button
                           type="button"
@@ -1892,7 +1907,9 @@ export default function ProductManagerEngine({
                         {status === 'archived' && archiveStockView === 'negative'
                           ? 'No live products with negative stock.'
                           : status === 'archived'
-                            ? 'No archived products (zero-stock items are hidden).'
+                            ? archiveSection === 'new-images'
+                              ? 'No Product Loader image items are waiting in Archive.'
+                              : 'No older archived products (zero-stock items are hidden).'
                             : 'No products in this view.'}
                       </p>
                     )}
@@ -2083,7 +2100,9 @@ export default function ProductManagerEngine({
                       {status === 'archived' && archiveStockView === 'negative'
                         ? 'No live products with negative stock.'
                         : status === 'archived'
-                          ? 'No archived products (zero-stock items are hidden).'
+                          ? archiveSection === 'new-images'
+                            ? 'No Product Loader image items are waiting in Archive.'
+                            : 'No older archived products (zero-stock items are hidden).'
                           : 'No products in this view.'}
                     </p>
                   )}

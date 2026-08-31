@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { verifyUnsubscribeToken } from './_brevo-email.js';
+import { suppressBrevoContact } from './_brevo-suppression.js';
 
 function decodeEmail(value) {
   try {
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
       unsubscribed_at: new Date().toISOString(),
     }, { onConflict: 'email' });
     if (error) throw error;
+    await suppressBrevoContact(email, { createIfMissing: true });
     return res.status(200).send(page({
       title: 'You have been unsubscribed',
       message: 'You will no longer receive Proto Trading marketing emails at this address. Important service emails, such as order updates, may still be sent when needed.',
