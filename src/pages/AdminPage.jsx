@@ -119,6 +119,7 @@ import PlacementsEditor from '../components/PlacementsEditor';
 import AdminSelect from '../components/AdminSelect';
 import ComingSoonPanel from '../components/ComingSoonPanel';
 import OrderEmailNotify from '../components/OrderEmailNotify';
+import DeliveryLabelCopy from '../components/DeliveryLabelCopy.jsx';
 import ProductManagerEngine from '../components/ProductManagerEngine';
 import GroupedSidebar, { NAV_GROUPS } from '../components/GroupedSidebar';
 import { useDashboardStats } from '../hooks/useDashboardStats';
@@ -1496,7 +1497,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
       clearInterval(timer);
       window.removeEventListener('focus', refresh);
     };
-  }, [activeSection]);
+    // Refresh the selected query, not the initial New-tab closure. Otherwise
+    // a focus/timer request can supersede All orders and strand its loading key.
+  }, [activeSection, orderTab, orderPage, orderPageSize, orderSearchDebounced]);
 
   // Remember the expanded order's row while it is present in the list, and
   // unpin the moment it reappears (e.g. the admin switched to the tab it
@@ -3136,6 +3139,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                               ))}
                             </div>
                             <OrderEmailNotify orderId={order.id} orderStatus={normalizeOrderStatus(order.status)} />
+                            <DeliveryLabelCopy customer={order.customers} />
                             {(() => {
                               const promo = orderPromo(order);
                               if (!promo) return null;
