@@ -23,6 +23,9 @@ export function shouldBlockPreviewRequest({ hostname = '', origin = '', url = ''
     const target = new URL(String(url), origin);
     if (target.origin !== origin || !target.pathname.startsWith('/api/')) return false;
     if (String(method).toUpperCase() === 'POST' && READ_ONLY_PREVIEW_POST_PATHS.has(target.pathname)) return false;
+    // Analysis queues aggregate read-only evidence. The API still requires an
+    // authenticated owner and an explicitly isolated preview gateway.
+    if (String(method).toUpperCase() === 'POST' && target.pathname === '/api/codex-analytics-jobs') return false;
     return true;
   } catch {
     return false;

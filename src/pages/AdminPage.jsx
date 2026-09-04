@@ -2467,8 +2467,8 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
             </SectionErrorBoundary>
 
             {activeSection === 'hermes' && (
-              <SectionErrorBoundary name="hermes" title="Hermes crashed" resetKey={activeSection}>
-                <Suspense fallback={<LazySectionFallback label="Loading Hermes…" />}>
+              <SectionErrorBoundary name="hermes" title="Apollo crashed" resetKey={activeSection}>
+                <Suspense fallback={<LazySectionFallback label="Loading Apollo…" />}>
                   <HermesPanel onSelectSection={setActiveSection} />
                 </Suspense>
               </SectionErrorBoundary>

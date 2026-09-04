@@ -43,6 +43,29 @@ describe('preview write guard', () => {
     })).toBe(true);
   });
 
+  it('allows only the Apollo read-only analysis enqueue in previews', () => {
+    const request = {
+      hostname: 'protoportal-admin-example-proto-team.vercel.app',
+      origin: 'https://protoportal-admin-example-proto-team.vercel.app',
+    };
+
+    expect(shouldBlockPreviewRequest({
+      ...request,
+      url: '/api/codex-analytics-jobs',
+      method: 'POST',
+    })).toBe(false);
+    expect(shouldBlockPreviewRequest({
+      ...request,
+      url: '/api/codex-analytics-jobs',
+      method: 'PUT',
+    })).toBe(true);
+    expect(shouldBlockPreviewRequest({
+      ...request,
+      url: '/api/codex-analytics-worker',
+      method: 'POST',
+    })).toBe(true);
+  });
+
   it('does not interfere with authentication or other external services', () => {
     expect(shouldBlockPreviewRequest({
       hostname: 'protoportal-admin-example-proto-team.vercel.app',

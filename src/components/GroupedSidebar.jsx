@@ -25,7 +25,7 @@ import { importWithRetry } from '../lib/lazyRetry';
 
 const NAV_ITEMS = [
   { id: 'orders', label: 'Order Requests', icon: ShoppingBag },
-  { id: 'hermes', label: 'Hermes', icon: Bot },
+  { id: 'hermes', label: 'Apollo', icon: Bot },
   { id: 'product-intelligence', label: 'Product Intelligence', icon: Search },
   { id: 'buying', label: 'Buying', icon: ClipboardList },
   { id: 'product-loader', label: 'Product Loader', icon: ScanLine },
