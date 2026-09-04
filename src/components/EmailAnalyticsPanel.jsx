@@ -48,6 +48,7 @@ function downloadCsv(filename, rows) {
 
 function recipientStatusRows(campaign) {
   const data = campaignRecipientData(campaign);
+  const approvals = campaignApprovalData(campaign);
   return data.emails.map((email) => [
     email,
     data.status.get(email),
@@ -58,6 +59,10 @@ function recipientStatusRows(campaign) {
     data.bounced.has(email) ? 'Yes' : 'No',
     data.unsubscribed.has(email) ? 'Yes' : 'No',
     data.complained.has(email) ? 'Yes' : 'No',
+    approvals.approved.has(email) ? 'Yes' : 'No',
+    approvals.converted.has(email) ? 'Yes' : 'No',
+    approvals.byEmail.get(email)?.approvedAt || '',
+    approvals.byEmail.get(email)?.estimated ? 'Estimated from account creation' : approvals.approved.has(email) ? 'Exact approval timestamp' : '',
   ]);
 }
 
@@ -66,6 +71,7 @@ const SORTS = {
   sent: (a, b) => b.sent - a.sent,
   opened: (a, b) => b.openRate - a.openRate,
   clicked: (a, b) => b.clickRate - a.clickRate,
+  converted: (a, b) => (b.approvalMetrics?.approvedAfterSend || 0) - (a.approvalMetrics?.approvedAfterSend || 0),
 };
 
 export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
@@ -137,6 +143,16 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
         openRate: Math.min(100, pct(openedUnique, sent)),
         clickRate: Math.min(100, pct(clickedUnique, sent)),
         bounceRate: Math.min(100, pct(bounced, sent)),
+        approvalMetrics: c.approvalMetrics || {
+          available: false,
+          approvedNow: 0,
+          approvedAfterSend: 0,
+          confirmedAfterSend: 0,
+          estimatedAfterSend: 0,
+          conversionRate: 0,
+          approvedCustomers: [],
+          convertedCustomers: [],
+        },
       };
     });
     const since = windowKey === 'all'
@@ -171,7 +187,7 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
 
   const exportCsv = () => {
     downloadCsv('proto-email-campaigns.csv', [
-      ['Sent at', 'Subject', 'Audience', 'Business types', 'Recipients', 'Send accepted', 'Delivery estimate', 'Delivery %', 'Opened (people)', 'Open %', 'Clicked (people)', 'Click %', 'Bounced', 'Bounce %', 'Opt-outs'],
+      ['Sent at', 'Subject', 'Audience', 'Business types', 'Recipients', 'Send accepted', 'Delivery estimate', 'Delivery %', 'Opened (people)', 'Open %', 'Clicked (people)', 'Click %', 'Bounced', 'Bounce %', 'Opt-outs', 'Approved now', 'Approved after send', 'Confirmed conversions', 'Estimated conversions', 'Conversion %'],
       ...rows.map((r) => [
         r.sentAt ? new Date(r.sentAt).toISOString() : '',
         r.subject || '(no subject)',
@@ -181,6 +197,11 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
         r.openedUnique, `${r.openRate}%`,
         r.clickedUnique, `${r.clickRate}%`,
         r.bounced, `${r.bounceRate}%`, r.unsubscribed,
+        r.approvalMetrics.approvedNow,
+        r.approvalMetrics.approvedAfterSend,
+        r.approvalMetrics.confirmedAfterSend,
+        r.approvalMetrics.estimatedAfterSend,
+        `${r.approvalMetrics.conversionRate}%`,
       ]),
     ]);
   };
@@ -217,7 +238,7 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
             </button>
           ))}
           <span className="adm-muted" style={{ fontSize: 12, fontWeight: 700 }}>Sort</span>
-          {[['date', 'Newest'], ['sent', 'Most sent'], ['opened', 'Best open rate'], ['clicked', 'Best click rate']].map(([key, label]) => (
+          {[['date', 'Newest'], ['sent', 'Most sent'], ['opened', 'Best open rate'], ['clicked', 'Best click rate'], ['converted', 'Most approvals']].map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -261,6 +282,8 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
                 <th className="adm-sheet__num">Clicked</th>
                 <th className="adm-sheet__num">Bounced</th>
                 <th className="adm-sheet__num">Opt-outs</th>
+                <th className="adm-sheet__num">Approved now</th>
+                <th className="adm-sheet__num">Approved after send</th>
                 <th>Status</th>
                 <th />
               </tr>
@@ -289,6 +312,20 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
                     {r.bounced > 0 && <span className="adm-rate adm-rate--bad">{r.bounceRate}%</span>}
                   </td>
                   <td data-label="Opt-outs" className="adm-sheet__num">{r.unsubscribed.toLocaleString('en-ZA')}</td>
+                  <td data-label="Approved now" className="adm-sheet__num">
+                    {r.approvalMetrics.available ? r.approvalMetrics.approvedNow.toLocaleString('en-ZA') : '—'}
+                  </td>
+                  <td data-label="Approved after send" className="adm-sheet__num">
+                    {r.approvalMetrics.available ? (
+                      <>
+                        {r.approvalMetrics.approvedAfterSend.toLocaleString('en-ZA')}
+                        <span className="adm-rate adm-rate--good">{r.approvalMetrics.conversionRate}%</span>
+                        {r.approvalMetrics.estimatedAfterSend > 0 && (
+                          <div className="adm-muted" style={{ fontSize: 10 }}>{r.approvalMetrics.estimatedAfterSend} estimated</div>
+                        )}
+                      </>
+                    ) : '—'}
+                  </td>
                   <td data-label="Status" className="adm-muted" style={{ fontSize: 12 }}>{r.isDraft ? 'Draft' : r.hasRecipientSnapshot ? 'Tracked' : 'Legacy'}</td>
                   <td data-label="Actions">
                     <button type="button" className="adm-btn-ghost adm-btn--sm" onClick={() => setDetail(r)}>
@@ -306,6 +343,9 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
         “Send accepted” means the Brevo API accepted the message. “Delivery estimate” subtracts recorded bounces;
         it is not a provider-confirmed delivery total. Open and click rates count each PERSON once, measured against
         accepted sends. Engagement stats arrive from Brevo webhooks, so a campaign sent moments ago may still show zeros.
+        “Approved after send” credits each approval once, to the latest saved campaign sent to that address before
+        approval. Historical approvals backfilled from account creation are labelled estimated; new approval
+        transitions are timestamped exactly.
       </p>
 
       {detail && <CampaignDetail campaign={detail} onClose={() => setDetail(null)} onCompose={onCompose} />}
@@ -355,8 +395,20 @@ function campaignRecipientData(campaign) {
   return { emails, opened, clicked, bounced, unsubscribed, complained, failed, accepted, delivered, status };
 }
 
+function campaignApprovalData(campaign) {
+  const approvedCustomers = campaign.approvalMetrics?.approvedCustomers || [];
+  const convertedCustomers = campaign.approvalMetrics?.convertedCustomers || [];
+  const byEmail = new Map(approvedCustomers.map((customer) => [String(customer.email || '').trim().toLowerCase(), customer]));
+  return {
+    approved: new Set(byEmail.keys()),
+    converted: new Set(convertedCustomers.map((customer) => String(customer.email || '').trim().toLowerCase())),
+    byEmail,
+  };
+}
+
 function CampaignDetail({ campaign, onClose, onCompose }) {
   const data = campaignRecipientData(campaign);
+  const approvals = campaignApprovalData(campaign);
   const snapshotEmails = uniqueEmails(campaign.recipientEmails);
   const hasRecipientSnapshot = snapshotEmails.length > 0;
   const noRecordedOpen = data.emails.filter((email) => data.accepted.has(email) && !data.opened.has(email));
@@ -386,16 +438,31 @@ function CampaignDetail({ campaign, onClose, onCompose }) {
     { key: 'bounced', label: 'Bounced', emails: [...data.bounced], note: 'Brevo recorded a bounce for these addresses.' },
     { key: 'unsubscribed', label: 'Unsubscribed', emails: [...data.unsubscribed], note: 'These contacts opted out of marketing email.' },
     { key: 'complained', label: 'Spam complaints', emails: [...data.complained], note: 'These contacts reported the message as spam.' },
+    {
+      key: 'approved',
+      label: 'Approved customers',
+      emails: [...approvals.approved],
+      note: 'Recipients who currently have an approved Proto trade account.',
+    },
+    {
+      key: 'converted',
+      label: 'Approved after campaign',
+      emails: [...approvals.converted],
+      note: campaign.approvalMetrics?.estimatedAfterSend
+        ? `${campaign.approvalMetrics.confirmedAfterSend || 0} exact and ${campaign.approvalMetrics.estimatedAfterSend} historically estimated from account creation.`
+        : 'Approval occurred after this campaign was sent, using an exact approval timestamp.',
+    },
   ];
   const links = Object.entries(campaign.clickedLinks || {});
   const [tab, setTab] = useState('all');
   const active = groups.find((g) => g.key === tab);
+  const isApprovalTab = tab === 'approved' || tab === 'converted';
 
   const fileStem = `campaign-${(campaign.subject || 'email').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
   const exportRecipients = (group) => {
     const allowed = group ? new Set(group.emails) : null;
     downloadCsv(`${fileStem}-${group ? group.key : 'all-statuses'}.csv`, [
-      ['Email', 'Status', 'Send accepted', 'Delivery estimate', 'Opened', 'Clicked', 'Bounced', 'Unsubscribed', 'Spam complaint'],
+      ['Email', 'Status', 'Send accepted', 'Delivery estimate', 'Opened', 'Clicked', 'Bounced', 'Unsubscribed', 'Spam complaint', 'Approved now', 'Approved after send', 'Approved at', 'Approval confidence'],
       ...recipientStatusRows(campaign).filter((row) => !allowed || allowed.has(row[0])),
     ]);
   };
@@ -444,11 +511,26 @@ function CampaignDetail({ campaign, onClose, onCompose }) {
               {active.unavailable ? null : (
                 <div className="adm-table-scroll" style={{ maxHeight: '50vh' }}>
                   <table className="adm-sheet">
-                    <thead><tr><th style={{ width: 48 }}>#</th><th>Email address</th></tr></thead>
+                    <thead><tr>
+                      <th style={{ width: 48 }}>#</th>
+                      <th>Email address</th>
+                      {isApprovalTab && <th>Customer</th>}
+                      {isApprovalTab && <th>Approved</th>}
+                      {isApprovalTab && <th>Confidence</th>}
+                    </tr></thead>
                     <tbody>
-                      {active.emails.map((email, i) => (
-                        <tr key={email}><td className="adm-muted">{i + 1}</td><td>{email}</td></tr>
-                      ))}
+                      {active.emails.map((email, i) => {
+                        const approval = approvals.byEmail.get(email);
+                        return (
+                          <tr key={email}>
+                            <td className="adm-muted">{i + 1}</td>
+                            <td>{email}</td>
+                            {isApprovalTab && <td>{approval?.businessName || approval?.contactName || '—'}</td>}
+                            {isApprovalTab && <td>{fmtDate(approval?.approvedAt)}</td>}
+                            {isApprovalTab && <td>{approval?.estimated ? 'Estimated' : 'Exact'}</td>}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
