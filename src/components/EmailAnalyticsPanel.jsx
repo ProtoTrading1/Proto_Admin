@@ -76,10 +76,12 @@ const SORTS = {
 
 export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
   const [campaigns, setCampaigns] = useState([]);
+  const [approvalSummary, setApprovalSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState('date');
   const [windowKey, setWindowKey] = useState('all');
   const [detail, setDetail] = useState(null);
+  const [showOrganic, setShowOrganic] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,9 +90,11 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load email campaigns');
       setCampaigns(json.campaigns || []);
+      setApprovalSummary(json.approvalSummary || null);
     } catch (err) {
       onShowToast?.(err.message || 'Failed to load email analytics', 'error');
       setCampaigns([]);
+      setApprovalSummary(null);
     } finally {
       setLoading(false);
     }
@@ -215,6 +219,12 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
         <Headline label="Opened" value={`${pct(totals.openedUnique, totals.sent)}%`} sub={`${totals.openedUnique.toLocaleString('en-ZA')} people`} />
         <Headline label="Clicked" value={`${pct(totals.clickedUnique, totals.sent)}%`} sub={`${totals.clickedUnique.toLocaleString('en-ZA')} people`} />
         <Headline label="Opt-outs" value={totals.unsubscribed.toLocaleString('en-ZA')} sub={totals.complained ? `${totals.complained} spam complaint${totals.complained === 1 ? '' : 's'}` : undefined} tone={totals.unsubscribed > 0 || totals.complained > 0 ? 'bad' : undefined} />
+        <Headline
+          label="Organic / unattributed approvals"
+          value={(approvalSummary?.organicApprovals?.length || 0).toLocaleString('en-ZA')}
+          sub={approvalSummary ? `${approvalSummary.confirmedOrganic || 0} exact · ${approvalSummary.estimatedOrganic || 0} historical estimates` : undefined}
+          action={approvalSummary?.organicApprovals?.length ? () => setShowOrganic(true) : undefined}
+        />
       </div>
 
       <div className="crm-campaign-summary" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -345,20 +355,94 @@ export default function EmailAnalyticsPanel({ onShowToast, onCompose }) {
         accepted sends. Engagement stats arrive from Brevo webhooks, so a campaign sent moments ago may still show zeros.
         “Approved after send” credits each approval once, to the latest saved campaign sent to that address before
         approval. Historical approvals backfilled from account creation are labelled estimated; new approval
-        transitions are timestamped exactly.
+        transitions are timestamped exactly. “Organic / unattributed” means no saved campaign with a recipient
+        snapshot can be credited; older campaigns without snapshots can make some historical approvals unattributable.
       </p>
 
       {detail && <CampaignDetail campaign={detail} onClose={() => setDetail(null)} onCompose={onCompose} />}
+      {showOrganic && (
+        <OrganicApprovalDetail
+          customers={approvalSummary?.organicApprovals || []}
+          onClose={() => setShowOrganic(false)}
+        />
+      )}
     </div>
   );
 }
 
-function Headline({ label, value, sub, tone }) {
+function Headline({ label, value, sub, tone, action }) {
   return (
-    <div className={`adm-email-stat${tone === 'bad' ? ' adm-email-stat--bad' : ''}`}>
+    <div
+      className={`adm-email-stat${tone === 'bad' ? ' adm-email-stat--bad' : ''}`}
+      role={action ? 'button' : undefined}
+      tabIndex={action ? 0 : undefined}
+      onClick={action}
+      onKeyDown={action ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          action();
+        }
+      } : undefined}
+      style={action ? { cursor: 'pointer' } : undefined}
+    >
       <div className="adm-email-stat__label">{label}</div>
       <div className="adm-email-stat__value">{value}</div>
       {sub && <div className="adm-email-stat__sub">{sub}</div>}
+      {action && <div className="adm-email-stat__sub" style={{ textDecoration: 'underline' }}>View customers</div>}
+    </div>
+  );
+}
+
+function OrganicApprovalDetail({ customers, onClose }) {
+  const exportCustomers = () => downloadCsv('proto-organic-unattributed-approvals.csv', [
+    ['Email', 'Business', 'Contact', 'Approved at', 'Approval confidence'],
+    ...customers.map((customer) => [
+      customer.email,
+      customer.businessName,
+      customer.contactName,
+      customer.approvedAt || '',
+      customer.estimated ? 'Estimated from account creation' : 'Exact approval timestamp',
+    ]),
+  ]);
+
+  return (
+    <div className="adm-modal-backdrop" onClick={onClose}>
+      <div className="adm-modal adm-modal--wide" onClick={(event) => event.stopPropagation()}>
+        <div className="adm-modal-header">
+          <div>
+            <h3 className="adm-modal-title">Organic / unattributed approvals</h3>
+            <p className="adm-modal-note" style={{ margin: '2px 0 0' }}>
+              Approved customers not attributable to a saved campaign recipient snapshot.
+            </p>
+          </div>
+          <button type="button" className="adm-modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
+        </div>
+        <div className="adm-modal-body">
+          <div className="adm-table-scroll" style={{ maxHeight: '55vh' }}>
+            <table className="adm-sheet" aria-label="Organic or unattributed approved customers">
+              <thead><tr><th>#</th><th>Email address</th><th>Customer</th><th>Contact</th><th>Approved</th><th>Confidence</th></tr></thead>
+              <tbody>
+                {customers.map((customer, index) => (
+                  <tr key={customer.email}>
+                    <td className="adm-muted">{index + 1}</td>
+                    <td>{customer.email}</td>
+                    <td>{customer.businessName || '—'}</td>
+                    <td>{customer.contactName || '—'}</td>
+                    <td>{fmtDate(customer.approvedAt)}</td>
+                    <td>{customer.estimated ? 'Estimated' : 'Exact'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="adm-modal-footer adm-modal-footer--end">
+          <button type="button" className="adm-btn-ghost" onClick={exportCustomers} disabled={!customers.length}>
+            <Download size={13} style={{ marginRight: 5, verticalAlign: -2 }} /> Export CSV
+          </button>
+          <button type="button" className="adm-btn-red" onClick={onClose}>Close</button>
+        </div>
+      </div>
     </div>
   );
 }

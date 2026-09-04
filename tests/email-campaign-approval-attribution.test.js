@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { enrichCampaignsWithApprovals } from '../lib/campaign-approval-attribution.mjs';
+import { buildCampaignApprovalReport, enrichCampaignsWithApprovals } from '../lib/campaign-approval-attribution.mjs';
 
 describe('email campaign approval attribution', () => {
   it('separates approved recipients from approvals after the send', () => {
@@ -64,18 +64,40 @@ describe('email campaign approval attribution', () => {
     expect(campaigns[1].approvalMetrics.approvedNow).toBe(1);
   });
 
+  it('lists approved customers with no attributable campaign as organic or unattributed', () => {
+    const report = buildCampaignApprovalReport([{
+      id: 'campaign-1',
+      sentAt: '2026-09-04T07:08:00.000Z',
+      recipientEmails: ['converted@example.com'],
+    }], [
+      { email: 'converted@example.com', is_approved: true, approved_at: '2026-09-04T08:00:00.000Z', approved_at_inferred: false },
+      { email: 'organic@example.com', business_name: 'Organic Shop', is_approved: true, approved_at: '2026-09-04T08:30:00.000Z', approved_at_inferred: false },
+      { email: 'historical@example.com', is_approved: true, created_at: '2026-08-01T08:30:00.000Z', approved_at_inferred: true },
+    ]);
+
+    expect(report.approvalSummary.attributedApprovals).toBe(1);
+    expect(report.approvalSummary.organicApprovals.map((customer) => customer.email)).toEqual([
+      'organic@example.com',
+      'historical@example.com',
+    ]);
+    expect(report.approvalSummary.confirmedOrganic).toBe(1);
+    expect(report.approvalSummary.estimatedOrganic).toBe(1);
+  });
+
   it('wires the secured API, analytics UI, and migration together', () => {
     const api = fs.readFileSync(new URL('../api/email-campaigns.js', import.meta.url), 'utf8');
     const ui = fs.readFileSync(new URL('../src/components/EmailAnalyticsPanel.jsx', import.meta.url), 'utf8');
     const migration = fs.readFileSync(new URL('../migrations/065_customer_approval_attribution.sql', import.meta.url), 'utf8');
 
     expect(api).toContain('requireAdminKey');
-    expect(api).toContain('enrichCampaignsWithApprovals');
+    expect(api).toContain('buildCampaignApprovalReport');
     expect(api).toContain(".eq('is_approved', true)");
     expect(ui).toContain('Approved after send');
     expect(ui).toContain("label: 'Approved customers'");
     expect(ui).toContain("label: 'Approved after campaign'");
     expect(ui).toContain('Historical approvals backfilled');
+    expect(ui).toContain('Organic / unattributed approvals');
+    expect(ui).toContain('proto-organic-unattributed-approvals.csv');
     expect(migration).toContain('approved_at_inferred');
     expect(migration).toContain('before insert or update on public.customers');
     expect(migration).not.toContain('security definer');

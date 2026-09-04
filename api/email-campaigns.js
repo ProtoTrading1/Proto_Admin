@@ -1,7 +1,7 @@
 import { requireAdminKey } from './_admin-auth.js';
 import { readEmailCampaigns } from './_email-campaigns.js';
 import { getPortalAdminClient } from './_site-config.js';
-import { enrichCampaignsWithApprovals } from '../lib/campaign-approval-attribution.mjs';
+import { buildCampaignApprovalReport } from '../lib/campaign-approval-attribution.mjs';
 
 const CUSTOMER_PAGE_SIZE = 1000;
 
@@ -52,9 +52,7 @@ export default async function handler(req, res) {
         readEmailCampaigns(),
         fetchApprovedCustomers(),
       ]);
-      return res.status(200).json({
-        campaigns: enrichCampaignsWithApprovals(campaigns, approvedCustomers),
-      });
+      return res.status(200).json(buildCampaignApprovalReport(campaigns, approvedCustomers));
     } catch (err) {
       return res.status(500).json({ error: err.message || 'Failed to load campaigns' });
     }
