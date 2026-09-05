@@ -1,0 +1,16 @@
+export {
+  isMotarroProduct,
+  buildMotarroBranch,
+  injectMotarroIntoTree,
+  findMotarroNode,
+  deriveMotarroPathFromLabels,
+  inferMotarroPathFromRow,
+  motarroPathSnapshot,
+  parseStoredMotarroPath,
+  isGeneralMotarroFallback,
+  MOTTARO_GENERAL_FALLBACK_PATH,
+  motarroPathMatchesFilter,
+  isMotarroBrowsePath,
+  enrichMotarroCategoryFields,
+  filterRowsByMotarroPath,
+} from '../lib/mottaro-category.mjs';

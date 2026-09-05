@@ -1,0 +1,1707 @@
+{
+  "meta": {
+    "sourceFile": "/workspace/data/Ribbon_Website_Integration.xlsx",
+    "copiedFrom": "/home/ubuntu/.cursor/projects/workspace/uploads/Ribbon_Website_Integration_17bf.xlsx",
+    "parsedAt": "2026-06-25T21:02:01.859Z"
+  },
+  "sheetNames": [
+    "Ribbon Website Import",
+    "Ribbon Taxonomy Changes",
+    "Missing SKUs",
+    "Validation Summary"
+  ],
+  "rowCountPerSheet": {
+    "Ribbon Website Import": 70,
+    "Ribbon Taxonomy Changes": 27,
+    "Missing SKUs": 70,
+    "Validation Summary": 12
+  },
+  "dataRowCountPerSheet": {
+    "Ribbon Website Import": 69,
+    "Ribbon Taxonomy Changes": 26,
+    "Missing SKUs": 69,
+    "Validation Summary": 11
+  },
+  "columnHeadersPerSheet": {
+    "Ribbon Website Import": [
+      "SKU",
+      "Product Name",
+      "Target Path",
+      "Current Category",
+      "Current Subcategory One",
+      "Current Subcategory Two",
+      "Current Subcategory Three",
+      "Current Path",
+      "Status"
+    ],
+    "Ribbon Taxonomy Changes": [
+      "Report Type",
+      "Path",
+      "Depth",
+      "Approved Product Count",
+      "Current Product Count",
+      "Notes"
+    ],
+    "Missing SKUs": [
+      "SKU",
+      "Product Name",
+      "Target Path",
+      "Reason"
+    ],
+    "Validation Summary": [
+      "Metric",
+      "Value"
+    ]
+  },
+  "textilesRibbonTaxonomy": {
+    "description": "Hierarchy under Textiles for ribbon products (paths from Target Path / Path columns)",
+    "root": "Textiles",
+    "uniqueFullPathCount": 24,
+    "uniqueRelativePathCount": 23,
+    "allUniqueFullPaths": [
+      "Textiles",
+      "Textiles > Acrylic & Blends",
+      "Textiles > Acrylic & Blends > Florist Ribbon",
+      "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+      "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+      "Textiles > Acrylic & Blends > Pull Ribbon",
+      "Textiles > Natural",
+      "Textiles > Natural > Jute Ribbon",
+      "Textiles > Natural > Jute Ribbon > 1.5mm",
+      "Textiles > Organza",
+      "Textiles > Organza > 6mm",
+      "Textiles > Organza > 9mm",
+      "Textiles > Petersham",
+      "Textiles > Petersham > 16mm",
+      "Textiles > Petersham > 32mm",
+      "Textiles > Petersham > 6mm",
+      "Textiles > Petersham > 9mm",
+      "Textiles > Ribbon & Trim",
+      "Textiles > Satin",
+      "Textiles > Satin > 16mm",
+      "Textiles > Satin > 25mm",
+      "Textiles > Satin > 5mm",
+      "Textiles > Satin > 6mm",
+      "Textiles > Satin > 9mm"
+    ],
+    "allUniqueRelativePaths": [
+      "Acrylic & Blends",
+      "Acrylic & Blends > Florist Ribbon",
+      "Acrylic & Blends > Florist Ribbon > 30mm",
+      "Acrylic & Blends > Florist Ribbon > 48mm",
+      "Acrylic & Blends > Pull Ribbon",
+      "Natural",
+      "Natural > Jute Ribbon",
+      "Natural > Jute Ribbon > 1.5mm",
+      "Organza",
+      "Organza > 6mm",
+      "Organza > 9mm",
+      "Petersham",
+      "Petersham > 16mm",
+      "Petersham > 32mm",
+      "Petersham > 6mm",
+      "Petersham > 9mm",
+      "Ribbon & Trim",
+      "Satin",
+      "Satin > 16mm",
+      "Satin > 25mm",
+      "Satin > 5mm",
+      "Satin > 6mm",
+      "Satin > 9mm"
+    ],
+    "hierarchy": [
+      {
+        "name": "Acrylic & Blends",
+        "level": 1,
+        "sampleSkus": [
+          "200082-BLK",
+          "200082-GRN",
+          "200082-YEL",
+          "200083-COR",
+          "200083-BLK",
+          "200083-BLU",
+          "200083-GOL",
+          "200083-GRN"
+        ],
+        "children": [
+          {
+            "name": "Florist Ribbon",
+            "level": 2,
+            "sampleSkus": [
+              "200082-BLK",
+              "200082-GRN",
+              "200082-YEL",
+              "200083-COR",
+              "200083-BLK",
+              "200083-BLU",
+              "200083-GOL",
+              "200083-GRN"
+            ],
+            "children": [
+              {
+                "name": "30mm",
+                "level": 3,
+                "productCount": 6,
+                "sampleSkus": [
+                  "200082-BLK",
+                  "200082-GRN",
+                  "200082-YEL"
+                ]
+              },
+              {
+                "name": "48mm",
+                "level": 3,
+                "productCount": 16,
+                "sampleSkus": [
+                  "200083-COR",
+                  "200083-BLK",
+                  "200083-BLU",
+                  "200083-GOL",
+                  "200083-GRN",
+                  "200083-SIL",
+                  "200083-WHT",
+                  "200083-YEL"
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Pull Ribbon",
+            "level": 2,
+            "productCount": 2,
+            "sampleSkus": [
+              "200077-LIL"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Natural",
+        "level": 1,
+        "sampleSkus": [
+          "8620200065"
+        ],
+        "children": [
+          {
+            "name": "Jute Ribbon",
+            "level": 2,
+            "sampleSkus": [
+              "8620200065"
+            ],
+            "children": [
+              {
+                "name": "1.5mm",
+                "level": 3,
+                "productCount": 2,
+                "sampleSkus": [
+                  "8620200065"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Organza",
+        "level": 1,
+        "sampleSkus": [
+          "ORG-257-6",
+          "ORG-122-6",
+          "ORG-67-6",
+          "ORG-92-6",
+          "ORG-26-6",
+          "ORG-168-9",
+          "ORG-26-9"
+        ],
+        "children": [
+          {
+            "name": "6mm",
+            "level": 2,
+            "productCount": 10,
+            "sampleSkus": [
+              "ORG-257-6",
+              "ORG-122-6",
+              "ORG-67-6",
+              "ORG-92-6",
+              "ORG-26-6"
+            ]
+          },
+          {
+            "name": "9mm",
+            "level": 2,
+            "productCount": 4,
+            "sampleSkus": [
+              "ORG-168-9",
+              "ORG-26-9"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Petersham",
+        "level": 1,
+        "sampleSkus": [
+          "PET-198-6",
+          "PET-123-6",
+          "PET-826-9",
+          "PET-030-9",
+          "PET-030-16",
+          "PET-338-16",
+          "PET-198-32",
+          "PET-030-32"
+        ],
+        "children": [
+          {
+            "name": "16mm",
+            "level": 2,
+            "productCount": 4,
+            "sampleSkus": [
+              "PET-030-16",
+              "PET-338-16"
+            ]
+          },
+          {
+            "name": "32mm",
+            "level": 2,
+            "productCount": 6,
+            "sampleSkus": [
+              "PET-198-32",
+              "PET-030-32",
+              "PET-720-32"
+            ]
+          },
+          {
+            "name": "6mm",
+            "level": 2,
+            "productCount": 4,
+            "sampleSkus": [
+              "PET-198-6",
+              "PET-123-6"
+            ]
+          },
+          {
+            "name": "9mm",
+            "level": 2,
+            "productCount": 4,
+            "sampleSkus": [
+              "PET-826-9",
+              "PET-030-9"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Ribbon & Trim",
+        "level": 1
+      },
+      {
+        "name": "Satin",
+        "level": 1,
+        "sampleSkus": [
+          "200072-RBOW",
+          "SAT-1019-6",
+          "SAT-175-6",
+          "SAT-30-6",
+          "SAT-835-6",
+          "SAT-1005-6",
+          "SAT-1036-6",
+          "SAT-1010-6"
+        ],
+        "children": [
+          {
+            "name": "16mm",
+            "level": 2,
+            "productCount": 32,
+            "sampleSkus": [
+              "SAT-1053-16",
+              "SAT-1087-16",
+              "SAT-175-16",
+              "SAT-323-16",
+              "SAT-30-16",
+              "SAT-329-16",
+              "SAT-370-16",
+              "SAT-563-16"
+            ]
+          },
+          {
+            "name": "25mm",
+            "level": 2,
+            "productCount": 14,
+            "sampleSkus": [
+              "SAT-1053-25",
+              "SAT-175-25",
+              "SAT-30-25",
+              "SAT-370-25",
+              "SAT-1036-25",
+              "SAT-29-25",
+              "SAT-1070-25"
+            ]
+          },
+          {
+            "name": "5mm",
+            "level": 2,
+            "productCount": 2,
+            "sampleSkus": [
+              "200072-RBOW"
+            ]
+          },
+          {
+            "name": "6mm",
+            "level": 2,
+            "productCount": 18,
+            "sampleSkus": [
+              "SAT-1019-6",
+              "SAT-175-6",
+              "SAT-30-6",
+              "SAT-835-6",
+              "SAT-1005-6",
+              "SAT-1036-6",
+              "SAT-1010-6",
+              "SAT-29-6"
+            ]
+          },
+          {
+            "name": "9mm",
+            "level": 2,
+            "productCount": 14,
+            "sampleSkus": [
+              "SAT-30-9",
+              "SAT-563-9",
+              "SAT-570-9",
+              "SAT-463-9",
+              "SAT-1005-9",
+              "SAT-29-9",
+              "SAT-1070-9"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "sheets": {
+    "Ribbon Website Import": {
+      "sheetName": "Ribbon Website Import",
+      "rowCount": 70,
+      "dataRowCount": 69,
+      "headers": [
+        "SKU",
+        "Product Name",
+        "Target Path",
+        "Current Category",
+        "Current Subcategory One",
+        "Current Subcategory Two",
+        "Current Subcategory Three",
+        "Current Path",
+        "Status"
+      ],
+      "pathColumn": "Target Path",
+      "skuColumn": "SKU",
+      "uniquePathCount": 15,
+      "uniquePaths": [
+        "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+        "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+        "Textiles > Acrylic & Blends > Pull Ribbon",
+        "Textiles > Natural > Jute Ribbon > 1.5mm",
+        "Textiles > Organza > 6mm",
+        "Textiles > Organza > 9mm",
+        "Textiles > Petersham > 16mm",
+        "Textiles > Petersham > 32mm",
+        "Textiles > Petersham > 6mm",
+        "Textiles > Petersham > 9mm",
+        "Textiles > Satin > 16mm",
+        "Textiles > Satin > 25mm",
+        "Textiles > Satin > 5mm",
+        "Textiles > Satin > 6mm",
+        "Textiles > Satin > 9mm"
+      ],
+      "allSkus": [
+        "200072-RBOW",
+        "200077-LIL",
+        "200082-BLK",
+        "200082-GRN",
+        "200082-YEL",
+        "200083-BLK",
+        "200083-BLU",
+        "200083-COR",
+        "200083-GOL",
+        "200083-GRN",
+        "200083-SIL",
+        "200083-WHT",
+        "200083-YEL",
+        "8620200065",
+        "ORG-122-6",
+        "ORG-168-9",
+        "ORG-257-6",
+        "ORG-26-6",
+        "ORG-26-9",
+        "ORG-67-6",
+        "ORG-92-6",
+        "PET-030-16",
+        "PET-030-32",
+        "PET-030-9",
+        "PET-123-6",
+        "PET-198-32",
+        "PET-198-6",
+        "PET-338-16",
+        "PET-720-32",
+        "PET-826-9",
+        "SAT-1005-6",
+        "SAT-1005-9",
+        "SAT-1010-6",
+        "SAT-1019-6",
+        "SAT-1036-16",
+        "SAT-1036-25",
+        "SAT-1036-6",
+        "SAT-1053-16",
+        "SAT-1053-25",
+        "SAT-1070-16",
+        "SAT-1070-25",
+        "SAT-1070-6",
+        "SAT-1070-9",
+        "SAT-1087-16",
+        "SAT-175-16",
+        "SAT-175-25",
+        "SAT-175-6",
+        "SAT-29-16",
+        "SAT-29-25",
+        "SAT-29-6",
+        "SAT-29-9",
+        "SAT-30-16",
+        "SAT-30-25",
+        "SAT-30-6",
+        "SAT-30-9",
+        "SAT-323-16",
+        "SAT-329-16",
+        "SAT-342-16",
+        "SAT-370-16",
+        "SAT-370-25",
+        "SAT-463-9",
+        "SAT-563-16",
+        "SAT-563-9",
+        "SAT-570-16",
+        "SAT-570-9",
+        "SAT-580-16",
+        "SAT-589-16",
+        "SAT-835-16",
+        "SAT-835-6"
+      ],
+      "sampleSkus": [
+        "200082-BLK",
+        "200082-GRN",
+        "200082-YEL",
+        "200083-COR",
+        "200083-BLK",
+        "200083-BLU",
+        "200083-GOL",
+        "200083-GRN",
+        "200083-SIL",
+        "200083-WHT"
+      ],
+      "products": [
+        {
+          "sku": "200082-BLK",
+          "productName": "Florist Ribbon – Black, 3cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200082-GRN",
+          "productName": "Florist Ribbon – Green, 3cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200082-YEL",
+          "productName": "Florist Ribbon – Yellow, 3cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-COR",
+          "productName": "Florist Ribbon – Coral, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-BLK",
+          "productName": "Florist Ribbon – Black, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-BLU",
+          "productName": "Florist Ribbon – Blue, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-GOL",
+          "productName": "Florist Ribbon – Gold, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-GRN",
+          "productName": "Florist Ribbon – Green, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-SIL",
+          "productName": "Florist Ribbon – Silver, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-WHT",
+          "productName": "Florist Ribbon – White, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200083-YEL",
+          "productName": "Florist Ribbon – Yellow, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200077-LIL",
+          "productName": "Pull Ribbon - Style-B – Lilac, ±15x15cm Bow, 10 Pack",
+          "targetPath": "Textiles > Acrylic & Blends > Pull Ribbon",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "8620200065",
+          "productName": "Jute Ribbon – Natural, 1.5mm, ±10m Reel",
+          "targetPath": "Textiles > Natural > Jute Ribbon > 1.5mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "ORG-257-6",
+          "productName": "Organza Ribbon – 6mm Mustard",
+          "targetPath": "Textiles > Organza > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "ORG-122-6",
+          "productName": "Organza Ribbon – 6mm Old Gold",
+          "targetPath": "Textiles > Organza > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "ORG-67-6",
+          "productName": "Organza Ribbon – 6mm Army Green",
+          "targetPath": "Textiles > Organza > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "ORG-92-6",
+          "productName": "Organza Ribbon – 6mm Dusty Pink",
+          "targetPath": "Textiles > Organza > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "ORG-26-6",
+          "productName": "Organza Ribbon – 6mm Red",
+          "targetPath": "Textiles > Organza > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "ORG-168-9",
+          "productName": "Organza Ribbon – 9mm Plum",
+          "targetPath": "Textiles > Organza > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "ORG-26-9",
+          "productName": "Organza Ribbon – 9mm Red",
+          "targetPath": "Textiles > Organza > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-198-6",
+          "productName": "Petersham Ribbon – 6mm La Rosa",
+          "targetPath": "Textiles > Petersham > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-123-6",
+          "productName": "Petersham Ribbon – 6mm Pearl Pink",
+          "targetPath": "Textiles > Petersham > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-826-9",
+          "productName": "Petersham Ribbon – 9mm Raw Silk",
+          "targetPath": "Textiles > Petersham > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-030-9",
+          "productName": "Petersham Ribbon – 9mm Black",
+          "targetPath": "Textiles > Petersham > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-030-16",
+          "productName": "Petersham Ribbon – 16mm Black",
+          "targetPath": "Textiles > Petersham > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-338-16",
+          "productName": "Petersham Ribbon – 16mm Antique Blue",
+          "targetPath": "Textiles > Petersham > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-198-32",
+          "productName": "Petersham Ribbon – 32mm La Rosa",
+          "targetPath": "Textiles > Petersham > 32mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-030-32",
+          "productName": "Petersham Ribbon – 32mm Black",
+          "targetPath": "Textiles > Petersham > 32mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "PET-720-32",
+          "productName": "Petersham Ribbon – 32mm Peach",
+          "targetPath": "Textiles > Petersham > 32mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "200072-RBOW",
+          "productName": "Florist Ribbon – Satin Rainbow, 5mm, ±11.5m Reel",
+          "targetPath": "Textiles > Satin > 5mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1019-6",
+          "productName": "Satin Ribbon – 6mm Grape",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-175-6",
+          "productName": "Satin Ribbon – 6mm Cerise",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-30-6",
+          "productName": "Satin Ribbon – 6mm Black",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-835-6",
+          "productName": "Satin Ribbon – 6mm Nude",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1005-6",
+          "productName": "Satin Ribbon – 6mm Antique Pink",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1036-6",
+          "productName": "Satin Ribbon – 6mm Light Pink",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1010-6",
+          "productName": "Satin Ribbon – 6mm Silver Grey",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-29-6",
+          "productName": "Satin Ribbon – 6mm White",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1070-6",
+          "productName": "Satin Ribbon – 6mm Yellow",
+          "targetPath": "Textiles > Satin > 6mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-30-9",
+          "productName": "Satin Ribbon – 9mm Black",
+          "targetPath": "Textiles > Satin > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-563-9",
+          "productName": "Satin Ribbon – 9mm Olive Green",
+          "targetPath": "Textiles > Satin > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-570-9",
+          "productName": "Satin Ribbon – 9mm Avo Green",
+          "targetPath": "Textiles > Satin > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-463-9",
+          "productName": "Satin Ribbon – 9mm Lilac",
+          "targetPath": "Textiles > Satin > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1005-9",
+          "productName": "Satin Ribbon – 9mm Antique Pink",
+          "targetPath": "Textiles > Satin > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-29-9",
+          "productName": "Satin Ribbon – 9mm White",
+          "targetPath": "Textiles > Satin > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1070-9",
+          "productName": "Satin Ribbon – 9mm Yellow",
+          "targetPath": "Textiles > Satin > 9mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1053-16",
+          "productName": "Satin Ribbon – 16mm Scarlet",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1087-16",
+          "productName": "Satin Ribbon – 16mm Dark Dark Emerald",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-175-16",
+          "productName": "Satin Ribbon – 16mm Cerise",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-323-16",
+          "productName": "Satin Ribbon – 16mm Aqua",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-30-16",
+          "productName": "Satin Ribbon – 16mm Black",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-329-16",
+          "productName": "Satin Ribbon – 16mm Royal Blue",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-370-16",
+          "productName": "Satin Ribbon – 16mm Navy Blue",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-563-16",
+          "productName": "Satin Ribbon – 16mm Olive Green",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-570-16",
+          "productName": "Satin Ribbon – 16mm Avo Green",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-580-16",
+          "productName": "Satin Ribbon – 16mm Green",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-589-16",
+          "productName": "Satin Ribbon – 16mm Emerald Green",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-835-16",
+          "productName": "Satin Ribbon – 16mm Nude",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1036-16",
+          "productName": "Satin Ribbon – 16mm Light Pink",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-342-16",
+          "productName": "Satin Ribbon – 16mm Teal",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-29-16",
+          "productName": "Satin Ribbon – 16mm White",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1070-16",
+          "productName": "Satin Ribbon – 16mm Yellow",
+          "targetPath": "Textiles > Satin > 16mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1053-25",
+          "productName": "Satin Ribbon – 25mm Scarlet",
+          "targetPath": "Textiles > Satin > 25mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-175-25",
+          "productName": "Satin Ribbon – 25mm Cerise",
+          "targetPath": "Textiles > Satin > 25mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-30-25",
+          "productName": "Satin Ribbon – 25mm Black",
+          "targetPath": "Textiles > Satin > 25mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-370-25",
+          "productName": "Satin Ribbon – 25mm Navy Blue",
+          "targetPath": "Textiles > Satin > 25mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1036-25",
+          "productName": "Satin Ribbon – 25mm Light Pink",
+          "targetPath": "Textiles > Satin > 25mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-29-25",
+          "productName": "Satin Ribbon – 25mm White",
+          "targetPath": "Textiles > Satin > 25mm",
+          "status": "MISSING_SKU"
+        },
+        {
+          "sku": "SAT-1070-25",
+          "productName": "Satin Ribbon – 25mm Yellow",
+          "targetPath": "Textiles > Satin > 25mm",
+          "status": "MISSING_SKU"
+        }
+      ]
+    },
+    "Ribbon Taxonomy Changes": {
+      "sheetName": "Ribbon Taxonomy Changes",
+      "rowCount": 27,
+      "dataRowCount": 26,
+      "headers": [
+        "Report Type",
+        "Path",
+        "Depth",
+        "Approved Product Count",
+        "Current Product Count",
+        "Notes"
+      ],
+      "uniquePathCount": 24,
+      "uniquePaths": [
+        "Textiles",
+        "Textiles > Acrylic & Blends",
+        "Textiles > Acrylic & Blends > Florist Ribbon",
+        "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+        "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+        "Textiles > Acrylic & Blends > Pull Ribbon",
+        "Textiles > Natural",
+        "Textiles > Natural > Jute Ribbon",
+        "Textiles > Natural > Jute Ribbon > 1.5mm",
+        "Textiles > Organza",
+        "Textiles > Organza > 6mm",
+        "Textiles > Organza > 9mm",
+        "Textiles > Petersham",
+        "Textiles > Petersham > 16mm",
+        "Textiles > Petersham > 32mm",
+        "Textiles > Petersham > 6mm",
+        "Textiles > Petersham > 9mm",
+        "Textiles > Ribbon & Trim",
+        "Textiles > Satin",
+        "Textiles > Satin > 16mm",
+        "Textiles > Satin > 25mm",
+        "Textiles > Satin > 5mm",
+        "Textiles > Satin > 6mm",
+        "Textiles > Satin > 9mm"
+      ],
+      "categoriesToCreate": [
+        "Textiles > Acrylic & Blends > Florist Ribbon",
+        "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+        "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+        "Textiles > Acrylic & Blends > Pull Ribbon",
+        "Textiles > Natural",
+        "Textiles > Natural > Jute Ribbon",
+        "Textiles > Natural > Jute Ribbon > 1.5mm",
+        "Textiles > Organza > 6mm",
+        "Textiles > Organza > 9mm",
+        "Textiles > Petersham > 16mm",
+        "Textiles > Petersham > 32mm",
+        "Textiles > Petersham > 6mm",
+        "Textiles > Petersham > 9mm",
+        "Textiles > Satin > 16mm",
+        "Textiles > Satin > 25mm",
+        "Textiles > Satin > 5mm",
+        "Textiles > Satin > 6mm",
+        "Textiles > Satin > 9mm"
+      ],
+      "categoriesToKeep": [
+        "Textiles",
+        "Textiles > Acrylic & Blends",
+        "Textiles > Organza",
+        "Textiles > Petersham",
+        "Textiles > Satin"
+      ],
+      "entries": [
+        {
+          "reportType": "Existing categories to keep",
+          "path": "Textiles",
+          "depth": 1,
+          "approvedProductCount": 69,
+          "currentProductCount": 392,
+          "notes": "Present in current website taxonomy."
+        },
+        {
+          "reportType": "Existing categories to keep",
+          "path": "Textiles > Acrylic & Blends",
+          "depth": 2,
+          "approvedProductCount": 12,
+          "currentProductCount": 19,
+          "notes": "Present in current website taxonomy."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Acrylic & Blends > Florist Ribbon",
+          "depth": 3,
+          "approvedProductCount": 11,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+          "depth": 4,
+          "approvedProductCount": 3,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+          "depth": 4,
+          "approvedProductCount": 8,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Acrylic & Blends > Pull Ribbon",
+          "depth": 3,
+          "approvedProductCount": 1,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Natural",
+          "depth": 2,
+          "approvedProductCount": 1,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Natural > Jute Ribbon",
+          "depth": 3,
+          "approvedProductCount": 1,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Natural > Jute Ribbon > 1.5mm",
+          "depth": 4,
+          "approvedProductCount": 1,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "Existing categories to keep",
+          "path": "Textiles > Organza",
+          "depth": 2,
+          "approvedProductCount": 7,
+          "currentProductCount": 117,
+          "notes": "Present in current website taxonomy."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Organza > 6mm",
+          "depth": 3,
+          "approvedProductCount": 5,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Organza > 9mm",
+          "depth": 3,
+          "approvedProductCount": 2,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "Existing categories to keep",
+          "path": "Textiles > Petersham",
+          "depth": 2,
+          "approvedProductCount": 9,
+          "currentProductCount": 131,
+          "notes": "Present in current website taxonomy."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Petersham > 16mm",
+          "depth": 3,
+          "approvedProductCount": 2,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Petersham > 32mm",
+          "depth": 3,
+          "approvedProductCount": 3,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Petersham > 6mm",
+          "depth": 3,
+          "approvedProductCount": 2,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Petersham > 9mm",
+          "depth": 3,
+          "approvedProductCount": 2,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "Existing categories to keep",
+          "path": "Textiles > Satin",
+          "depth": 2,
+          "approvedProductCount": 40,
+          "currentProductCount": 81,
+          "notes": "Present in current website taxonomy."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Satin > 16mm",
+          "depth": 3,
+          "approvedProductCount": 16,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Satin > 25mm",
+          "depth": 3,
+          "approvedProductCount": 7,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Satin > 5mm",
+          "depth": 3,
+          "approvedProductCount": 1,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Satin > 6mm",
+          "depth": 3,
+          "approvedProductCount": 9,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "New categories to create",
+          "path": "Textiles > Satin > 9mm",
+          "depth": 3,
+          "approvedProductCount": 7,
+          "currentProductCount": 0,
+          "notes": "Approved workbook path is not present on current website rows."
+        },
+        {
+          "reportType": "Existing categories",
+          "path": "Textiles > Ribbon & Trim",
+          "depth": 2,
+          "approvedProductCount": 0,
+          "currentProductCount": 44,
+          "notes": "Current website ribbon taxonomy path not represented in approved workbook."
+        },
+        {
+          "reportType": "Empty categories",
+          "approvedProductCount": 0,
+          "currentProductCount": 0,
+          "notes": "Field-based website taxonomy has no standalone empty category rows to create or remove."
+        },
+        {
+          "reportType": "Duplicate categories",
+          "approvedProductCount": 0,
+          "currentProductCount": 0,
+          "notes": "No duplicate normalized ribbon taxonomy paths detected in current website rows."
+        }
+      ]
+    },
+    "Missing SKUs": {
+      "sheetName": "Missing SKUs",
+      "rowCount": 70,
+      "dataRowCount": 69,
+      "headers": [
+        "SKU",
+        "Product Name",
+        "Target Path",
+        "Reason"
+      ],
+      "pathColumn": "Target Path",
+      "skuColumn": "SKU",
+      "uniquePathCount": 15,
+      "uniquePaths": [
+        "Textiles > Acrylic & Blends > Florist Ribbon > 30mm",
+        "Textiles > Acrylic & Blends > Florist Ribbon > 48mm",
+        "Textiles > Acrylic & Blends > Pull Ribbon",
+        "Textiles > Natural > Jute Ribbon > 1.5mm",
+        "Textiles > Organza > 6mm",
+        "Textiles > Organza > 9mm",
+        "Textiles > Petersham > 16mm",
+        "Textiles > Petersham > 32mm",
+        "Textiles > Petersham > 6mm",
+        "Textiles > Petersham > 9mm",
+        "Textiles > Satin > 16mm",
+        "Textiles > Satin > 25mm",
+        "Textiles > Satin > 5mm",
+        "Textiles > Satin > 6mm",
+        "Textiles > Satin > 9mm"
+      ],
+      "allSkus": [
+        "200072-RBOW",
+        "200077-LIL",
+        "200082-BLK",
+        "200082-GRN",
+        "200082-YEL",
+        "200083-BLK",
+        "200083-BLU",
+        "200083-COR",
+        "200083-GOL",
+        "200083-GRN",
+        "200083-SIL",
+        "200083-WHT",
+        "200083-YEL",
+        "8620200065",
+        "ORG-122-6",
+        "ORG-168-9",
+        "ORG-257-6",
+        "ORG-26-6",
+        "ORG-26-9",
+        "ORG-67-6",
+        "ORG-92-6",
+        "PET-030-16",
+        "PET-030-32",
+        "PET-030-9",
+        "PET-123-6",
+        "PET-198-32",
+        "PET-198-6",
+        "PET-338-16",
+        "PET-720-32",
+        "PET-826-9",
+        "SAT-1005-6",
+        "SAT-1005-9",
+        "SAT-1010-6",
+        "SAT-1019-6",
+        "SAT-1036-16",
+        "SAT-1036-25",
+        "SAT-1036-6",
+        "SAT-1053-16",
+        "SAT-1053-25",
+        "SAT-1070-16",
+        "SAT-1070-25",
+        "SAT-1070-6",
+        "SAT-1070-9",
+        "SAT-1087-16",
+        "SAT-175-16",
+        "SAT-175-25",
+        "SAT-175-6",
+        "SAT-29-16",
+        "SAT-29-25",
+        "SAT-29-6",
+        "SAT-29-9",
+        "SAT-30-16",
+        "SAT-30-25",
+        "SAT-30-6",
+        "SAT-30-9",
+        "SAT-323-16",
+        "SAT-329-16",
+        "SAT-342-16",
+        "SAT-370-16",
+        "SAT-370-25",
+        "SAT-463-9",
+        "SAT-563-16",
+        "SAT-563-9",
+        "SAT-570-16",
+        "SAT-570-9",
+        "SAT-580-16",
+        "SAT-589-16",
+        "SAT-835-16",
+        "SAT-835-6"
+      ],
+      "sampleSkus": [
+        "200082-BLK",
+        "200082-GRN",
+        "200082-YEL",
+        "200083-COR",
+        "200083-BLK",
+        "200083-BLU",
+        "200083-GOL",
+        "200083-GRN",
+        "200083-SIL",
+        "200083-WHT"
+      ],
+      "products": [
+        {
+          "sku": "200082-BLK",
+          "productName": "Florist Ribbon – Black, 3cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 30mm"
+        },
+        {
+          "sku": "200082-GRN",
+          "productName": "Florist Ribbon – Green, 3cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 30mm"
+        },
+        {
+          "sku": "200082-YEL",
+          "productName": "Florist Ribbon – Yellow, 3cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 30mm"
+        },
+        {
+          "sku": "200083-COR",
+          "productName": "Florist Ribbon – Coral, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200083-BLK",
+          "productName": "Florist Ribbon – Black, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200083-BLU",
+          "productName": "Florist Ribbon – Blue, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200083-GOL",
+          "productName": "Florist Ribbon – Gold, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200083-GRN",
+          "productName": "Florist Ribbon – Green, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200083-SIL",
+          "productName": "Florist Ribbon – Silver, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200083-WHT",
+          "productName": "Florist Ribbon – White, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200083-YEL",
+          "productName": "Florist Ribbon – Yellow, 4.8cm, ±90m Reel",
+          "targetPath": "Textiles > Acrylic & Blends > Florist Ribbon > 48mm"
+        },
+        {
+          "sku": "200077-LIL",
+          "productName": "Pull Ribbon - Style-B – Lilac, ±15x15cm Bow, 10 Pack",
+          "targetPath": "Textiles > Acrylic & Blends > Pull Ribbon"
+        },
+        {
+          "sku": "8620200065",
+          "productName": "Jute Ribbon – Natural, 1.5mm, ±10m Reel",
+          "targetPath": "Textiles > Natural > Jute Ribbon > 1.5mm"
+        },
+        {
+          "sku": "ORG-257-6",
+          "productName": "Organza Ribbon – 6mm Mustard",
+          "targetPath": "Textiles > Organza > 6mm"
+        },
+        {
+          "sku": "ORG-122-6",
+          "productName": "Organza Ribbon – 6mm Old Gold",
+          "targetPath": "Textiles > Organza > 6mm"
+        },
+        {
+          "sku": "ORG-67-6",
+          "productName": "Organza Ribbon – 6mm Army Green",
+          "targetPath": "Textiles > Organza > 6mm"
+        },
+        {
+          "sku": "ORG-92-6",
+          "productName": "Organza Ribbon – 6mm Dusty Pink",
+          "targetPath": "Textiles > Organza > 6mm"
+        },
+        {
+          "sku": "ORG-26-6",
+          "productName": "Organza Ribbon – 6mm Red",
+          "targetPath": "Textiles > Organza > 6mm"
+        },
+        {
+          "sku": "ORG-168-9",
+          "productName": "Organza Ribbon – 9mm Plum",
+          "targetPath": "Textiles > Organza > 9mm"
+        },
+        {
+          "sku": "ORG-26-9",
+          "productName": "Organza Ribbon – 9mm Red",
+          "targetPath": "Textiles > Organza > 9mm"
+        },
+        {
+          "sku": "PET-198-6",
+          "productName": "Petersham Ribbon – 6mm La Rosa",
+          "targetPath": "Textiles > Petersham > 6mm"
+        },
+        {
+          "sku": "PET-123-6",
+          "productName": "Petersham Ribbon – 6mm Pearl Pink",
+          "targetPath": "Textiles > Petersham > 6mm"
+        },
+        {
+          "sku": "PET-826-9",
+          "productName": "Petersham Ribbon – 9mm Raw Silk",
+          "targetPath": "Textiles > Petersham > 9mm"
+        },
+        {
+          "sku": "PET-030-9",
+          "productName": "Petersham Ribbon – 9mm Black",
+          "targetPath": "Textiles > Petersham > 9mm"
+        },
+        {
+          "sku": "PET-030-16",
+          "productName": "Petersham Ribbon – 16mm Black",
+          "targetPath": "Textiles > Petersham > 16mm"
+        },
+        {
+          "sku": "PET-338-16",
+          "productName": "Petersham Ribbon – 16mm Antique Blue",
+          "targetPath": "Textiles > Petersham > 16mm"
+        },
+        {
+          "sku": "PET-198-32",
+          "productName": "Petersham Ribbon – 32mm La Rosa",
+          "targetPath": "Textiles > Petersham > 32mm"
+        },
+        {
+          "sku": "PET-030-32",
+          "productName": "Petersham Ribbon – 32mm Black",
+          "targetPath": "Textiles > Petersham > 32mm"
+        },
+        {
+          "sku": "PET-720-32",
+          "productName": "Petersham Ribbon – 32mm Peach",
+          "targetPath": "Textiles > Petersham > 32mm"
+        },
+        {
+          "sku": "200072-RBOW",
+          "productName": "Florist Ribbon – Satin Rainbow, 5mm, ±11.5m Reel",
+          "targetPath": "Textiles > Satin > 5mm"
+        },
+        {
+          "sku": "SAT-1019-6",
+          "productName": "Satin Ribbon – 6mm Grape",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-175-6",
+          "productName": "Satin Ribbon – 6mm Cerise",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-30-6",
+          "productName": "Satin Ribbon – 6mm Black",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-835-6",
+          "productName": "Satin Ribbon – 6mm Nude",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-1005-6",
+          "productName": "Satin Ribbon – 6mm Antique Pink",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-1036-6",
+          "productName": "Satin Ribbon – 6mm Light Pink",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-1010-6",
+          "productName": "Satin Ribbon – 6mm Silver Grey",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-29-6",
+          "productName": "Satin Ribbon – 6mm White",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-1070-6",
+          "productName": "Satin Ribbon – 6mm Yellow",
+          "targetPath": "Textiles > Satin > 6mm"
+        },
+        {
+          "sku": "SAT-30-9",
+          "productName": "Satin Ribbon – 9mm Black",
+          "targetPath": "Textiles > Satin > 9mm"
+        },
+        {
+          "sku": "SAT-563-9",
+          "productName": "Satin Ribbon – 9mm Olive Green",
+          "targetPath": "Textiles > Satin > 9mm"
+        },
+        {
+          "sku": "SAT-570-9",
+          "productName": "Satin Ribbon – 9mm Avo Green",
+          "targetPath": "Textiles > Satin > 9mm"
+        },
+        {
+          "sku": "SAT-463-9",
+          "productName": "Satin Ribbon – 9mm Lilac",
+          "targetPath": "Textiles > Satin > 9mm"
+        },
+        {
+          "sku": "SAT-1005-9",
+          "productName": "Satin Ribbon – 9mm Antique Pink",
+          "targetPath": "Textiles > Satin > 9mm"
+        },
+        {
+          "sku": "SAT-29-9",
+          "productName": "Satin Ribbon – 9mm White",
+          "targetPath": "Textiles > Satin > 9mm"
+        },
+        {
+          "sku": "SAT-1070-9",
+          "productName": "Satin Ribbon – 9mm Yellow",
+          "targetPath": "Textiles > Satin > 9mm"
+        },
+        {
+          "sku": "SAT-1053-16",
+          "productName": "Satin Ribbon – 16mm Scarlet",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-1087-16",
+          "productName": "Satin Ribbon – 16mm Dark Dark Emerald",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-175-16",
+          "productName": "Satin Ribbon – 16mm Cerise",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-323-16",
+          "productName": "Satin Ribbon – 16mm Aqua",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-30-16",
+          "productName": "Satin Ribbon – 16mm Black",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-329-16",
+          "productName": "Satin Ribbon – 16mm Royal Blue",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-370-16",
+          "productName": "Satin Ribbon – 16mm Navy Blue",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-563-16",
+          "productName": "Satin Ribbon – 16mm Olive Green",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-570-16",
+          "productName": "Satin Ribbon – 16mm Avo Green",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-580-16",
+          "productName": "Satin Ribbon – 16mm Green",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-589-16",
+          "productName": "Satin Ribbon – 16mm Emerald Green",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-835-16",
+          "productName": "Satin Ribbon – 16mm Nude",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-1036-16",
+          "productName": "Satin Ribbon – 16mm Light Pink",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-342-16",
+          "productName": "Satin Ribbon – 16mm Teal",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-29-16",
+          "productName": "Satin Ribbon – 16mm White",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-1070-16",
+          "productName": "Satin Ribbon – 16mm Yellow",
+          "targetPath": "Textiles > Satin > 16mm"
+        },
+        {
+          "sku": "SAT-1053-25",
+          "productName": "Satin Ribbon – 25mm Scarlet",
+          "targetPath": "Textiles > Satin > 25mm"
+        },
+        {
+          "sku": "SAT-175-25",
+          "productName": "Satin Ribbon – 25mm Cerise",
+          "targetPath": "Textiles > Satin > 25mm"
+        },
+        {
+          "sku": "SAT-30-25",
+          "productName": "Satin Ribbon – 25mm Black",
+          "targetPath": "Textiles > Satin > 25mm"
+        },
+        {
+          "sku": "SAT-370-25",
+          "productName": "Satin Ribbon – 25mm Navy Blue",
+          "targetPath": "Textiles > Satin > 25mm"
+        },
+        {
+          "sku": "SAT-1036-25",
+          "productName": "Satin Ribbon – 25mm Light Pink",
+          "targetPath": "Textiles > Satin > 25mm"
+        },
+        {
+          "sku": "SAT-29-25",
+          "productName": "Satin Ribbon – 25mm White",
+          "targetPath": "Textiles > Satin > 25mm"
+        },
+        {
+          "sku": "SAT-1070-25",
+          "productName": "Satin Ribbon – 25mm Yellow",
+          "targetPath": "Textiles > Satin > 25mm"
+        }
+      ]
+    },
+    "Validation Summary": {
+      "sheetName": "Validation Summary",
+      "rowCount": 12,
+      "dataRowCount": 11,
+      "headers": [
+        "Metric",
+        "Value"
+      ],
+      "rows": [
+        {
+          "Metric": "approved ribbon products",
+          "Value": "69"
+        },
+        {
+          "Metric": "website rows matched by sku",
+          "Value": "0"
+        },
+        {
+          "Metric": "missing skus",
+          "Value": "69"
+        },
+        {
+          "Metric": "taxonomy paths approved",
+          "Value": "23"
+        },
+        {
+          "Metric": "taxonomy paths already on website",
+          "Value": "5"
+        },
+        {
+          "Metric": "taxonomy paths to create",
+          "Value": "18"
+        },
+        {
+          "Metric": "products requiring assignment update",
+          "Value": "0"
+        },
+        {
+          "Metric": "validation passed",
+          "Value": "NO"
+        },
+        {
+          "Metric": "applied updates",
+          "Value": "0"
+        },
+        {
+          "Metric": "validation errors",
+          "Value": "Missing SKUs: 69"
+        },
+        {
+          "Metric": "elapsed time seconds",
+          "Value": "1.55"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+# Cloudflare Tunnel — Proto SQL Bridge (example)
+# 1. cloudflared tunnel create proto-sql-bridge
+# 2. Copy credentials JSON path below
+# 3. Add public hostname in Zero Trust dashboard OR use ingress here
+# 4. cloudflared tunnel route dns proto-sql-bridge sql-bridge.proto.co.za
+
+tunnel: <TUNNEL_UUID>
+credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: sql-bridge.proto.co.za
+    service: http://localhost:8765
+  - service: http_status:404

@@ -1,0 +1,56 @@
+BLADERUNNER IMAGE INTAKE — Script 3 (production-ready)
+======================================================
+
+Copy scripts from this folder to:
+  C:\script\
+
+Folder layout on BLADERUNNER:
+  C:\script\
+    product_image_intake.py
+    r2_storage.py
+    image_intake_service.py
+    .env
+    NewImages\
+    ProcessedImages\
+    FailedImages\
+
+Setup
+-----
+1. Copy script files to C:\script
+2. pip install -r requirements.txt
+3. Copy env.example → .env and fill in credentials
+4. Add R2 keys (same as protoportal-admin Vercel env)
+5. Drop labelled images in NewImages\  (e.g. 8626100145.jpg)
+
+Pilot (dry run)
+---------------
+  DRY_RUN=true
+  IMAGE_INTAKE_MAX_FILES=3
+
+  python product_image_intake.py
+
+Live run (after pilot OK)
+-------------------------
+  DRY_RUN=false
+  IMAGE_INTAKE_MAX_FILES=0
+
+  python product_image_intake.py
+
+Per-file flow
+-------------
+  Filename → STMAST lookup (read-only)
+  → create products row if missing (PRICE_A × 1.15, R0.50)
+  → upload to R2: proto-images/{SKU}/{slot}.jpg
+  → update website_stock.image_url_one|two|three|four (barcode = SKU)
+  → move file to ProcessedImages or FailedImages
+
+Logs
+----
+  image_intake_run.log      — detailed [FOUND] [R2] [WEBSITE] [FINAL]
+  image_intake_run_report.md
+  image_intake_run_report.json
+
+Safety
+------
+  DRY_RUN=true skips uploads, product inserts, and website_stock writes.
+  Originals are never deleted — only moved between folders.

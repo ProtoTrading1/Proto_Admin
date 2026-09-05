@@ -1,0 +1,37 @@
+services:
+  image-processor:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8767:8080"
+    environment:
+      PROCESSOR_API_KEY: "${PROCESSOR_API_KEY}"
+      PROCESSOR_CALLBACK_SECRET: "${PROCESSOR_CALLBACK_SECRET:-}"
+      PROCESSOR_CALLBACK_HOSTS: "${PROCESSOR_CALLBACK_HOSTS:-}"
+      PROCESSOR_DATA_DIR: /data
+      PROCESSOR_WORKERS: "2"
+    volumes:
+      - processor-data:/data
+      - rembg-models:/models
+
+  queue-worker:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "processor.pull_worker"]
+    environment:
+      PROCESSOR_API_KEY: "${PROCESSOR_API_KEY}"
+      PROCESSOR_DATA_DIR: /data
+      PROCESSOR_WORKERS: "2"
+      PROCESSOR_TRANSPORT: admin-http
+      PROCESSOR_ADMIN_API_URL: "${PROCESSOR_ADMIN_API_URL}"
+      PROCESSOR_ADMIN_API_TOKEN: "${PROCESSOR_ADMIN_API_TOKEN}"
+      PROCESSOR_TRANSPORT_ALLOWED_HOSTS: "${PROCESSOR_TRANSPORT_ALLOWED_HOSTS}"
+      PROCESSOR_WORKER_ID: "${PROCESSOR_WORKER_ID:-bladerunner-image-worker}"
+      PROCESSOR_POLL_SECONDS: "${PROCESSOR_POLL_SECONDS:-10}"
+    volumes:
+      - processor-data:/data
+      - rembg-models:/models
+
+volumes:
+  processor-data:
+  rembg-models:

@@ -1,0 +1,49 @@
+{
+  "name": "protoportal-admin",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/apply-category-move-xlsx.mjs --apply-if-pending && node scripts/fix-writing-correction-categories.mjs --apply-if-pending && node scripts/fix-art-supplies-categories.mjs --apply-if-pending && vite build",
+    "lint": "eslint src lib api tests",
+    "preview": "vite preview",
+    "resize-images": "node scripts/resize-product-images.mjs",
+    "test:nutstore-filename": "node scripts/test-nutstore-filename.mjs",
+    "deploy:admin": "node scripts/deploy-admin.mjs",
+    "test:bi": "vitest run",
+    "test:bridge-json": "python scripts/test_sql_bridge_json.py",
+    "test:stmast-repro": "python scripts/test-stmast-decimal-repro.py"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1073.0",
+    "@fal-ai/client": "^1.10.1",
+    "@supabase/supabase-js": "^2.105.4",
+    "@tanstack/query-sync-storage-persister": "^5.101.0",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query-persist-client": "^5.101.0",
+    "@tanstack/react-virtual": "^3.14.4",
+    "@vercel/analytics": "^2.0.1",
+    "exceljs": "^3.4.0",
+    "jimp": "^1.6.1",
+    "jspdf": "^4.2.1",
+    "jszip": "3.10.1",
+    "lucide-react": "^1.9.0",
+    "mssql": "^12.5.5",
+    "pdfjs-dist": "6.1.200",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tesseract.js": "7.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^10.8.1",
+    "happy-dom": "^20.10.3",
+    "vite": "^8.0.10",
+    "vitest": "^3.2.7"
+  }
+}

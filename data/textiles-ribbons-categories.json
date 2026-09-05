@@ -1,0 +1,59 @@
+{
+  "main": "Textiles",
+  "description": "Ribbon taxonomy extracted from Ribbon_Website_Integration.xlsx — use as subcategories under Textiles in categories.json",
+  "categories": [
+    {
+      "name": "Acrylic & Blends",
+      "children": [
+        {
+          "name": "Florist Ribbon",
+          "children": [
+            { "name": "30mm" },
+            { "name": "48mm" }
+          ]
+        },
+        { "name": "Pull Ribbon" }
+      ]
+    },
+    {
+      "name": "Natural",
+      "children": [
+        {
+          "name": "Jute Ribbon",
+          "children": [
+            { "name": "1.5mm" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Organza",
+      "children": [
+        { "name": "6mm" },
+        { "name": "9mm" }
+      ]
+    },
+    {
+      "name": "Petersham",
+      "children": [
+        { "name": "6mm" },
+        { "name": "9mm" },
+        { "name": "16mm" },
+        { "name": "32mm" }
+      ]
+    },
+    {
+      "name": "Ribbon & Trim"
+    },
+    {
+      "name": "Satin",
+      "children": [
+        { "name": "5mm" },
+        { "name": "6mm" },
+        { "name": "9mm" },
+        { "name": "16mm" },
+        { "name": "25mm" }
+      ]
+    }
+  ]
+}

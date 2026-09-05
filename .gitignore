@@ -1,0 +1,14 @@
+node_modules
+dist
+.env.local
+.env*.local
+.vercel
+.env*
+data/*.numbers
+portal-tmp
+
+# Bridge launcher generated on BLADERUNNER-PC — it can carry SQL_PASSWORD /
+# STOCK_SQL_BRIDGE_KEY inline, so it must never be committed. Secrets belong
+# in .env (already ignored above).
+scripts/start-sql-bridge.ps1
+scripts/start-sql-bridge.local.*
