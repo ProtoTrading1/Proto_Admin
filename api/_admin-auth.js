@@ -42,9 +42,9 @@ function safeEqual(a, b) {
 }
 
 function getSupabaseAuthClient() {
-  const url = process.env.VITE_SUPABASE_URL;
-  const key = process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY');
+  const url = process.env.ADMIN_AUTH_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.ADMIN_AUTH_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Missing admin authentication Supabase configuration');
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 

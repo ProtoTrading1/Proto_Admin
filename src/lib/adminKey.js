@@ -1,5 +1,5 @@
 /** Patches window.fetch with the verified admin JWT, or a fulfillment link token. */
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabaseAuth';
 
 /**
  * Where the fulfilment page gets its order from.
@@ -39,12 +39,12 @@ async function attachAuthHeaders(headers) {
     return;
   }
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabaseAuth.auth.getSession();
     if (session?.access_token) {
       headers.set('Authorization', `Bearer ${session.access_token}`);
       return;
     }
-    const { data } = await supabase.auth.refreshSession();
+    const { data } = await supabaseAuth.auth.refreshSession();
     if (data.session?.access_token) {
       headers.set('Authorization', `Bearer ${data.session.access_token}`);
     }
@@ -73,7 +73,7 @@ export function installAuthFetch() {
 
     if (response.status === 401 && !linkMode && !getOrderAccessFromUrl().orderId) {
       try {
-        const { data } = await supabase.auth.refreshSession();
+        const { data } = await supabaseAuth.auth.refreshSession();
         if (data.session?.access_token) {
           headers.set('Authorization', `Bearer ${data.session.access_token}`);
           response = await originalFetch(input, { ...init, headers });

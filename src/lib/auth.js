@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabaseAuth';
 import { OperationTimeoutError, withTimeout } from './asyncTimeout';
 
 export const ADMIN_AUTH_TIMEOUT_MS = 10_000;
@@ -27,7 +27,7 @@ export function isAllowedAdminEmail(email) {
 }
 
 export async function getSession() {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const { data: { session }, error } = await supabaseAuth.auth.getSession();
   if (error) throw error;
   return session;
 }
@@ -35,7 +35,7 @@ export async function getSession() {
 /** Validates JWT with Supabase — use on boot instead of getSession() alone. */
 export async function getVerifiedSession() {
   const { data: { session }, error: sessionError } = await withTimeout(
-    supabase.auth.getSession(),
+    supabaseAuth.auth.getSession(),
     ADMIN_AUTH_TIMEOUT_MS,
     'Supabase did not return the admin session in time.',
     'admin_session_read_timeout',
@@ -44,7 +44,7 @@ export async function getVerifiedSession() {
   if (!session?.access_token) return null;
 
   const { data: { user }, error } = await withTimeout(
-    supabase.auth.getUser(),
+    supabaseAuth.auth.getUser(),
     ADMIN_AUTH_TIMEOUT_MS,
     'Supabase did not verify the admin session in time.',
     'admin_session_timeout',
@@ -52,7 +52,7 @@ export async function getVerifiedSession() {
   if (error) throw error;
   if (!user?.email) return null;
   if (!isAllowedAdminEmail(user.email)) {
-    await supabase.auth.signOut();
+    await supabaseAuth.auth.signOut();
     return null;
   }
   return session;
@@ -79,20 +79,20 @@ export async function getAccessToken() {
 }
 
 export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabaseAuth.auth.signInWithPassword({
     email: String(email).trim().toLowerCase(),
     password,
   });
   if (error) throw error;
   if (!isAllowedAdminEmail(data.user?.email)) {
-    await supabase.auth.signOut();
+    await supabaseAuth.auth.signOut();
     throw new Error('This account is not authorized for the admin dashboard.');
   }
   return data.session;
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabaseAuth.auth.signOut();
   if (error) throw error;
 }
 
@@ -112,7 +112,7 @@ export async function requestPasswordReset(email) {
 }
 
 export function onAuthStateChange(callback) {
-  return supabase.auth.onAuthStateChange((_event, session) => {
+  return supabaseAuth.auth.onAuthStateChange((_event, session) => {
     callback(session);
   });
 }
