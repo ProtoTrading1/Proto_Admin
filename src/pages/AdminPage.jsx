@@ -419,6 +419,36 @@ function TenThousandClubBadge({ customer }) {
   );
 }
 
+/** Blue pill for accounts registered on the standalone school-supply site.
+ * Falls back to the institution sales channel so schools registered before
+ * migration 066 (which adds is_school) are still badged. */
+function SchoolBadge({ customer }) {
+  const isSchool = customer?.is_school === true
+    || customer?.sales_channels?.includes?.('School, church or institution');
+  if (!isSchool) return null;
+  const role = String(customer?.school_role || '').trim();
+  return (
+    <span
+      title={role
+        ? `Registered on the school-supply site — contact role: ${role}`
+        : 'Registered on the school-supply site. Approve and allocate a customer code as usual.'}
+      style={{
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: 0.4,
+        color: '#1e3a8a',
+        background: '#dbeafe',
+        border: '1px solid #3b82f6',
+        borderRadius: 4,
+        padding: '1px 6px',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      SCHOOL
+    </span>
+  );
+}
+
 const LAST_EMAIL_LABELS = {
   welcome: 'Welcome sent',
   campaign: 'Campaign sent',
@@ -2813,6 +2843,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                               <Check size={14} color="#15803d" strokeWidth={3} aria-label="WhatsApp opted in" />
                             )}
                             <TenThousandClubBadge customer={person} />
+                            <SchoolBadge customer={person} />
                             <LastEmailBadge customer={person} />
                           </div>
                           <div className="adm-muted" style={{ fontSize: 11 }}>{person.name}{person.business_type ? ` · ${person.business_type}` : ''}</div>
@@ -2884,6 +2915,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                               <Check size={14} color="#15803d" strokeWidth={3} aria-label="WhatsApp opted in" />
                             )}
                             <TenThousandClubBadge customer={person} />
+                            <SchoolBadge customer={person} />
                             <LastEmailBadge customer={person} />
                           </span>
                           {(person.first_name || person.contact_name) && (
@@ -3259,7 +3291,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                 loading={profileOrdersLoading}
                 loadError={profileOrdersError}
                 onRetry={() => void openCustomerProfile(profileCustomer, profileSource)}
-                headerBadges={<><TenThousandClubBadge customer={profileCustomer} /><LastEmailBadge customer={profileCustomer} /></>}
+                headerBadges={<><TenThousandClubBadge customer={profileCustomer} /><SchoolBadge customer={profileCustomer} /><LastEmailBadge customer={profileCustomer} /></>}
               />
 
               {profileEditing ? (
