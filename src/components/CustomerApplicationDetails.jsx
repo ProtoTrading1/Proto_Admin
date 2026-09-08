@@ -5,6 +5,7 @@ import {
   CheckCircle,
   CircleHelp,
   Globe,
+  GraduationCap,
   MapPin,
   MessageCircle,
   Search,
@@ -54,6 +55,8 @@ export function hasApplicationAnswers(customer = {}) {
     customer.sales_channels,
     customer.product_categories,
     customer.business_description,
+    customer.school_role,
+    customer.supply_needs,
     customer.monthly_spend,
     customer.website,
     customer.claimed_customer_code,
@@ -88,6 +91,9 @@ function Chips({ items }) {
 export default function CustomerApplicationDetails({ customer }) {
   const isOnHold = customer.application_status === 'on_hold';
   const salesChannels = values(customer.sales_channels);
+  const supplyNeeds = values(customer.supply_needs);
+  const isSchool = customer.is_school === true
+    || salesChannels.includes('School, church or institution');
   const productCategories = values(customer.product_categories);
   const deliveryAddress = applicationAddress(customer);
   const websiteHref = applicationWebsiteHref(customer.website);
@@ -102,7 +108,7 @@ export default function CustomerApplicationDetails({ customer }) {
     <section className="adm-application" aria-labelledby="customer-application-heading">
       <div className="adm-application-head">
         <div>
-          <span className="adm-application-kicker">Online trade application</span>
+          <span className="adm-application-kicker">{isSchool ? 'School registration' : 'Online trade application'}</span>
           <h3 id="customer-application-heading">Application details</h3>
         </div>
         <span className={`adm-application-status adm-application-status--${customer.is_approved ? 'approved' : isOnHold ? 'on-hold' : 'pending'}`}>
@@ -123,6 +129,16 @@ export default function CustomerApplicationDetails({ customer }) {
 
       {hasApplicationAnswers(customer) ? (
         <div className="adm-application-grid">
+          {isSchool && (
+            <Detail icon={GraduationCap} label="Role at the school">
+              {text(customer.school_role) || 'Not answered'}
+            </Detail>
+          )}
+          {isSchool && (
+            <Detail icon={ShoppingBag} label="Supply needs" wide>
+              {supplyNeeds.length ? <Chips items={supplyNeeds} /> : 'Not answered'}
+            </Detail>
+          )}
           <Detail icon={Store} label="How they trade" wide>
             {salesChannels.length ? <Chips items={salesChannels} /> : 'Not answered'}
           </Detail>
