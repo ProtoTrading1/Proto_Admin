@@ -5,6 +5,7 @@ const adminPage = fs.readFileSync(new URL('../src/pages/AdminPage.jsx', import.m
 const application = fs.readFileSync(new URL('../src/components/CustomerApplicationDetails.jsx', import.meta.url), 'utf8');
 const customersApi = fs.readFileSync(new URL('../api/admin-customers.js', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('../migrations/066_school_signup.sql', import.meta.url), 'utf8');
+const typeMigration = fs.readFileSync(new URL('../migrations/067_school_type.sql', import.meta.url), 'utf8');
 
 describe('school customer badge', () => {
   it('badges accounts registered on the school-supply site', () => {
@@ -26,6 +27,14 @@ describe('school customer badge', () => {
     expect(adminPage).toMatch(/<TenThousandClubBadge customer=\{person\} \/>\s*<SchoolBadge customer=\{person\} \/>/);
   });
 
+  it('distinguishes public from private schools', () => {
+    expect(application).toContain("label=\"School type\"");
+    expect(application).toMatch(/customer\.school_type/);
+    expect(adminPage).toMatch(/customer\?\.school_type/);
+    expect(typeMigration).toMatch(/add column if not exists school_type text/i);
+    expect(typeMigration).toMatch(/'Public school', 'Private school'/);
+  });
+
   it('surfaces the school answers in the application panel', () => {
     expect(application).toContain("label=\"Role at the school\"");
     expect(application).toContain("label=\"Supply needs\"");
@@ -35,7 +44,7 @@ describe('school customer badge', () => {
   });
 
   it('lets an admin correct the school fields', () => {
-    expect(customersApi).toContain("'is_school', 'school_role', 'supply_needs'");
+    expect(customersApi).toContain("'is_school', 'school_type', 'school_role', 'supply_needs'");
   });
 
   it('adds the columns the badge reads', () => {

@@ -55,6 +55,7 @@ export function hasApplicationAnswers(customer = {}) {
     customer.sales_channels,
     customer.product_categories,
     customer.business_description,
+    customer.school_type,
     customer.school_role,
     customer.supply_needs,
     customer.monthly_spend,
@@ -129,6 +130,11 @@ export default function CustomerApplicationDetails({ customer }) {
 
       {hasApplicationAnswers(customer) ? (
         <div className="adm-application-grid">
+          {isSchool && (
+            <Detail icon={GraduationCap} label="School type">
+              {text(customer.school_type) || text(customer.business_type) || 'Not answered'}
+            </Detail>
+          )}
           {isSchool && (
             <Detail icon={GraduationCap} label="Role at the school">
               {text(customer.school_role) || 'Not answered'}

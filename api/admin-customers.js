@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       'country', 'province', 'city', 'accept_whatsapp', 'customer_code',
       'sales_last_12_months', 'invoice_count', 'last_purchase_date',
       'contact_name', 'first_name', 'tags',
-      'is_school', 'school_role', 'supply_needs',
+      'is_school', 'school_type', 'school_role', 'supply_needs',
       'application_status', 'application_hold_reason', 'application_held_at',
     ]);
     const { id, ...rawPatch } = req.body || {};

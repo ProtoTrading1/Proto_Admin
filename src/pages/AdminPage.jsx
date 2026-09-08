@@ -426,12 +426,15 @@ function SchoolBadge({ customer }) {
   const isSchool = customer?.is_school === true
     || customer?.sales_channels?.includes?.('School, church or institution');
   if (!isSchool) return null;
-  const role = String(customer?.school_role || '').trim();
+  const detail = [
+    String(customer?.school_type || '').trim(),
+    String(customer?.school_role || '').trim(),
+  ].filter(Boolean).join(' · ');
   return (
     <span
-      title={role
-        ? `Registered on the school-supply site — contact role: ${role}`
-        : 'Registered on the school-supply site. Approve and allocate a customer code as usual.'}
+      title={detail
+        ? `Registered on the school-supply site — ${detail}`
+        : 'Registered on the school-supply site. Allocate a customer code when ready.'}
       style={{
         fontSize: 10,
         fontWeight: 800,
