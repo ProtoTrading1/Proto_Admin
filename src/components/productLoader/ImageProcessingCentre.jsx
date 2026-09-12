@@ -26,6 +26,7 @@ import {
   summarizeImageProcessingJobs,
   updateImageProcessingJob,
 } from '../../lib/imageProcessingJobs.js';
+import InstoreImageControlPanel from './InstoreImageControlPanel.jsx';
 
 const ACTIVE_STATUSES = new Set(['queued', 'processing', 'retrying']);
 const EXECUTABLE_STATUSES = new Set(['processing', 'retrying']);
@@ -924,6 +925,8 @@ export default function ImageProcessingCentre({
         <CheckCircle size={17} />
         <div><strong>Website-ready standard</strong><span>Approved archive versions use a clean white 1600 × 1600 canvas. The original upload and transparent cleaned master are retained privately for restoration and future adjustments. Checks flag clutter, crop and centring, canvas consistency, clarity, lighting and ambiguous labels for human review.</span></div>
       </div>
+
+      <InstoreImageControlPanel onShowToast={onShowToast} />
 
       {nutstoreConnection.status === 'missing' && (
         <div className="ipc-config-warning" role="status">
