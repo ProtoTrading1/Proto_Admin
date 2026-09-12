@@ -25,11 +25,24 @@ describe('Instore image-only archive contract', () => {
     expect(migration).toContain('insert into public.instore_image_control_events');
   });
 
+  it('keeps storefront-removal controls separate from image controls', () => {
+    const route = readFileSync(join(ROOT, 'api/instore-image-controls.js'), 'utf8');
+    const migration = readFileSync(join(ROOT, 'migrations/069_instore_listing_controls.sql'), 'utf8');
+    expect(route).toContain("rpc('set_instore_listing_control'");
+    expect(route).not.toContain("from('extended_range_items').update");
+    expect(migration).toContain('create table if not exists public.instore_listing_controls');
+    expect(migration).toContain('enable row level security');
+    expect(migration).toContain('grant all on public.instore_listing_controls to service_role');
+    expect(migration).toContain('security invoker');
+  });
+
   it('makes the owner workflow explicit about preserving the sellable SKU', () => {
     const panel = readFileSync(join(ROOT, 'src/components/productLoader/InstoreImageControlPanel.jsx'), 'utf8');
     expect(panel).toContain('Hide a wrong photo without archiving the product');
     expect(panel).toContain('Product, price and stock are unchanged.');
     expect(panel).toContain("action === 'hide'");
     expect(panel).toContain("action === 'restore'");
+    expect(panel).toContain('Hide from Instore Products');
+    expect(panel).toContain('Restore to Instore Products');
   });
 });

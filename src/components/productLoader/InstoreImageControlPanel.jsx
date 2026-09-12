@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, ImageOff, Loader2, RefreshCw, Search, Undo2 } from 'lucide-react';
+import { Archive, EyeOff, ImageOff, Loader2, RefreshCw, Search, Undo2 } from 'lucide-react';
 import { readApiJson } from '../../lib/apiError.js';
 
 function normaliseSku(value) {
@@ -15,6 +15,7 @@ export default function InstoreImageControlPanel({ onShowToast }) {
   const [sku, setSku] = useState('');
   const [record, setRecord] = useState(null);
   const [reason, setReason] = useState('Incorrect or misleading product image');
+  const [listingReason, setListingReason] = useState('Remove from Instore Products');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -35,7 +36,8 @@ export default function InstoreImageControlPanel({ onShowToast }) {
 
   const change = async (action) => {
     if (!record?.item?.sku) return;
-    if (action === 'hide' && !String(reason || '').trim()) {
+    const activeReason = action === 'hide-listing' ? listingReason : reason;
+    if ((action === 'hide' || action === 'hide-listing') && !String(activeReason || '').trim()) {
       setError('Give a brief reason so the change is auditable.');
       return;
     }
@@ -44,12 +46,16 @@ export default function InstoreImageControlPanel({ onShowToast }) {
       const response = await fetch('/api/instore-image-controls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sku: record.item.sku, action, reason }),
+        body: JSON.stringify({ sku: record.item.sku, action, reason: activeReason }),
       });
       const result = await readApiJson(response);
       setRecord(await readControl(record.item.sku));
       onShowToast?.(action === 'hide'
         ? `${result.item.sku}: image hidden. Product, price and stock are unchanged.`
+        : action === 'hide-listing'
+          ? `${result.item.sku}: removed from Instore Products. The main catalogue, price and stock are unchanged.`
+          : action === 'restore-listing'
+            ? `${result.item.sku}: restored to Instore Products.`
         : `${result.item.sku}: original image restored.`);
     } catch (err) {
       setError(err?.message || 'Could not update this image control.');
@@ -57,6 +63,7 @@ export default function InstoreImageControlPanel({ onShowToast }) {
   };
 
   const hidden = record?.control?.status === 'hidden';
+  const listingHidden = record?.listingControl?.status === 'hidden';
   return (
     <section className="ipc-instore-image-control" aria-labelledby="instore-image-control-title">
       <div>
@@ -81,6 +88,7 @@ export default function InstoreImageControlPanel({ onShowToast }) {
           <strong>{record.item.title || record.item.sku}</strong>
           <span>SKU: {record.item.sku} · R{Number(record.item.price || 0).toFixed(2)} · {Number(record.item.available_stock || 0)} available</span>
           <span>{hidden ? 'Photo hidden from customers' : 'Current photo visible to customers'}</span>
+          <span>{listingHidden ? 'Removed from Instore Products' : 'Available in Instore Products'}</span>
           {!hidden && <label>Reason for hiding<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} /></label>}
           <div className="ipc-instore-image-control-actions">
             {hidden
@@ -88,6 +96,13 @@ export default function InstoreImageControlPanel({ onShowToast }) {
               : <button type="button" className="adm-btn-red" onClick={() => void change('hide')} disabled={saving}><ImageOff size={14} /> Hide incorrect image</button>}
             <button type="button" className="adm-btn-ghost" onClick={() => void load()} disabled={loading || saving}><RefreshCw size={14} /> Refresh</button>
           </div>
+          {!listingHidden && <label>Reason for removing from Instore Products<textarea value={listingReason} onChange={(event) => setListingReason(event.target.value)} maxLength={500} /></label>}
+          <div className="ipc-instore-image-control-actions">
+            {listingHidden
+              ? <button type="button" className="adm-btn-ghost" onClick={() => void change('restore-listing')} disabled={saving}><Undo2 size={14} /> Restore to Instore Products</button>
+              : <button type="button" className="adm-btn-red" onClick={() => void change('hide-listing')} disabled={saving}><EyeOff size={14} /> Hide from Instore Products</button>}
+          </div>
+          <small>This does not archive the product or alter price, stock, images, or the main website catalogue.</small>
           {record.events?.length > 0 && <small>Latest change: {record.events[0].previous_status} → {record.events[0].next_status} · {new Date(record.events[0].created_at).toLocaleString()}</small>}
         </div>
       </div>}
