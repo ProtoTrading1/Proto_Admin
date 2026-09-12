@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Loader2, Plus, X } from 'lucide-react';
 import { setLiveTaxonomyTree, updateProduct } from '../lib/products';
+import { applyDescriptionToAllRows } from '../lib/bulkProductEdit';
 import SellingUnitField from './SellingUnitField';
 import {
   childrenOfTree,
@@ -320,6 +321,10 @@ export default function BulkProductEditModal({
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
+  const applyDescriptionToAll = (description) => {
+    setRows((prev) => applyDescriptionToAllRows(prev, description));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setLiveTaxonomyTree(tree);
@@ -446,6 +451,18 @@ export default function BulkProductEditModal({
                       onChange={(e) => patchRow(index, { description: e.target.value })}
                       style={{ resize: 'vertical', fontFamily: 'inherit' }}
                     />
+                    {rows.length > 1 && (
+                      <div className="pm-bulk-description-actions">
+                        <button
+                          type="button"
+                          className="adm-btn-ghost pm-bulk-apply-description"
+                          onClick={() => applyDescriptionToAll(row.description)}
+                        >
+                          Apply to all selected products
+                        </button>
+                        <span>This copies this description to the other selected products before you save.</span>
+                      </div>
+                    )}
                   </label>
                 </div>
 
