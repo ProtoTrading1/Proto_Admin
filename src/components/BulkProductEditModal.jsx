@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Loader2, Plus, X } from 'lucide-react';
 import { setLiveTaxonomyTree, updateProduct } from '../lib/products';
-import { applyDescriptionToAllRows } from '../lib/bulkProductEdit';
+import { applyDescriptionToAllRows, applyTitleToAllRows } from '../lib/bulkProductEdit';
 import SellingUnitField from './SellingUnitField';
 import {
   childrenOfTree,
@@ -66,6 +66,7 @@ function categoryPathFromRow(row) {
 
 function rowSnapshot(row) {
   return {
+    title: row.title,
     description: row.description,
     packDescription: row.packDescription,
     unitsOfIssue: row.unitsOfIssue,
@@ -77,6 +78,7 @@ function rowSnapshot(row) {
 
 function buildPayload(original, row) {
   const payload = {};
+  if (row.title !== original.title) payload.name = row.title;
   if (row.description !== original.description) payload.description = row.description;
   if (row.packDescription !== original.packDescription) payload.packDescription = row.packDescription;
   if (row.unitsOfIssue !== original.unitsOfIssue) payload.unitsOfIssue = row.unitsOfIssue;
@@ -281,6 +283,7 @@ export default function BulkProductEditModal({
   const [saving, setSaving] = useState(false);
   const [taxonomySaving, setTaxonomySaving] = useState(false);
   const [newSub, setNewSub] = useState(null);
+  const [titleForAll, setTitleForAll] = useState('');
   const [descriptionForAll, setDescriptionForAll] = useState('');
 
   useEffect(() => {
@@ -324,6 +327,10 @@ export default function BulkProductEditModal({
 
   const applyDescriptionToAll = (description) => {
     setRows((prev) => applyDescriptionToAllRows(prev, description));
+  };
+
+  const applyTitleToAll = (title) => {
+    setRows((prev) => applyTitleToAllRows(prev, title));
   };
 
   const handleSave = async () => {
@@ -388,7 +395,7 @@ export default function BulkProductEditModal({
           </div>
 
           <p className="adm-modal-note">
-            Edit descriptions, pack size, barcode, website SKU, and category placement per product.
+            Edit product names, descriptions, pack size, barcode, website SKU, and category placement per product.
             Use child categories 1–3 for the full path. Changes save when you click Save all.
           </p>
 
@@ -396,11 +403,29 @@ export default function BulkProductEditModal({
             {rows.length > 1 && (
               <section className="pm-bulk-apply-description" aria-labelledby="bulk-apply-description-title">
                 <div>
-                  <h4 id="bulk-apply-description-title">Apply one description to all selected products</h4>
-                  <p>Enter the shared description here, then apply it to the draft below. Nothing is saved until you click Save all changes.</p>
+                  <h4 id="bulk-apply-description-title">Apply shared details to all selected products</h4>
+                  <p>Apply the product name or description to the draft below. Nothing is saved until you click Save all changes.</p>
                 </div>
                 <label className="pm-bulk-field">
-                  <span>Description for all selected products</span>
+                  <span>Main product name for all selected products</span>
+                  <input
+                    type="text"
+                    className="adm-field-input"
+                    value={titleForAll}
+                    onChange={(e) => setTitleForAll(e.target.value)}
+                    placeholder="e.g. Party foil curtain"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="adm-btn-ghost pm-bulk-apply-description-btn"
+                  onClick={() => applyTitleToAll(titleForAll)}
+                  disabled={!titleForAll.trim()}
+                >
+                  Apply product name to all selected products
+                </button>
+                <label className="pm-bulk-field">
+                  <span>Supporting description for all selected products</span>
                   <textarea
                     className="adm-field-input"
                     rows={3}
@@ -435,6 +460,15 @@ export default function BulkProductEditModal({
                 </header>
 
                 <div className="pm-bulk-edit-fields">
+                  <label className="pm-bulk-field pm-bulk-field--full">
+                    <span>Main product name</span>
+                    <input
+                      type="text"
+                      className="adm-field-input"
+                      value={row.title}
+                      onChange={(e) => patchRow(index, { title: e.target.value })}
+                    />
+                  </label>
                   <label className="pm-bulk-field">
                     <span>Website SKU (WSK)</span>
                     <input
