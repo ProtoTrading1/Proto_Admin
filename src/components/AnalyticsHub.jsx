@@ -1,6 +1,7 @@
 import { Suspense, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { lazyRetry } from '../lib/lazyRetry';
+import ApolloBusinessPulse from './ApolloBusinessPulse';
 
 const OrderAnalyticsDashboard = lazyRetry(() => import('./OrderAnalyticsDashboard'));
 const SearchAnalyticsDashboard = lazyRetry(() => import('./SearchAnalyticsDashboard'));
@@ -14,14 +15,17 @@ const VIEWS = [
   { key: 'engagement', label: 'Engagement', Component: EngagementPanel },
 ];
 
+const APOLLO_ENABLED = import.meta.env.VITE_APOLLO_PULSE_ENABLED === 'true';
+
 export default function AnalyticsHub() {
   const [view, setView] = useState('orders');
-  const Active = (VIEWS.find((item) => item.key === view) || VIEWS[0]).Component;
+  const availableViews = VIEWS.concat(APOLLO_ENABLED ? [{ key: 'apollo', label: 'Apollo Pulse', Component: ApolloBusinessPulse }] : []);
+  const Active = (availableViews.find((item) => item.key === view) || availableViews[0]).Component;
 
   return (
     <div className="oa-hub">
       <div className="adm-customer-tabs oa-hub-tabs">
-        {VIEWS.map((item) => (
+        {availableViews.map((item) => (
           <button
             key={item.key}
             type="button"
