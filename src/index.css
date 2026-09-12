@@ -8329,6 +8329,10 @@ html, body { background: #f5f5f5; color: #111827; }
   margin: 0 20px 12px; padding: 12px 14px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #f8fafc;
 }
 .pm-bulk-apply-cat h4 { margin: 0 0 10px; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+.pm-bulk-apply-description { margin: 0 20px 12px; padding: 12px 14px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #f8fafc; }
+.pm-bulk-apply-description h4 { margin: 0 0 4px; font-size: 13px; color: #1e293b; }
+.pm-bulk-apply-description p { margin: 0 0 10px; color: #64748b; font-size: 12px; line-height: 1.4; }
+.pm-bulk-apply-description-btn { margin-top: 8px; min-height: 34px; }
 .pm-bulk-edit-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #fff; }
 .pm-bulk-edit-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .pm-bulk-edit-card-title { min-width: 0; }
@@ -8341,9 +8345,6 @@ html, body { background: #f5f5f5; color: #111827; }
 .pm-bulk-field > span { font-size: 11px; font-weight: 650; color: #64748b; }
 .pm-bulk-field--wide { grid-column: 1 / -1; }
 .pm-bulk-field--full { grid-column: 1 / -1; }
-.pm-bulk-description-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
-.pm-bulk-description-actions span { color: #64748b; font-size: 12px; line-height: 1.35; }
-.pm-bulk-apply-description { min-height: 32px; padding: 5px 10px; white-space: nowrap; }
 .pm-bulk-edit-cat-section { padding-top: 10px; border-top: 1px solid #f1f5f9; }
 .pm-bulk-edit-cat-label { display: block; font-size: 11px; font-weight: 700; color: #8B1A1A; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .pm-bulk-cat { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }

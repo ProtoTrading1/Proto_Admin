@@ -281,6 +281,7 @@ export default function BulkProductEditModal({
   const [saving, setSaving] = useState(false);
   const [taxonomySaving, setTaxonomySaving] = useState(false);
   const [newSub, setNewSub] = useState(null);
+  const [descriptionForAll, setDescriptionForAll] = useState('');
 
   useEffect(() => {
     setTree(taxonomyTree);
@@ -392,6 +393,33 @@ export default function BulkProductEditModal({
           </p>
 
           <div className="adm-modal-body pm-bulk-edit-body">
+            {rows.length > 1 && (
+              <section className="pm-bulk-apply-description" aria-labelledby="bulk-apply-description-title">
+                <div>
+                  <h4 id="bulk-apply-description-title">Apply one description to all selected products</h4>
+                  <p>Enter the shared description here, then apply it to the draft below. Nothing is saved until you click Save all changes.</p>
+                </div>
+                <label className="pm-bulk-field">
+                  <span>Description for all selected products</span>
+                  <textarea
+                    className="adm-field-input"
+                    rows={3}
+                    value={descriptionForAll}
+                    onChange={(e) => setDescriptionForAll(e.target.value)}
+                    placeholder="e.g. Metal die-cast racing car"
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="adm-btn-ghost pm-bulk-apply-description-btn"
+                  onClick={() => applyDescriptionToAll(descriptionForAll)}
+                  disabled={!descriptionForAll.trim()}
+                >
+                  Apply to all selected products
+                </button>
+              </section>
+            )}
             {rows.map((row, index) => (
               <article key={originals[index].sku} className="pm-bulk-edit-card">
                 <header className="pm-bulk-edit-card-head">
@@ -451,18 +479,6 @@ export default function BulkProductEditModal({
                       onChange={(e) => patchRow(index, { description: e.target.value })}
                       style={{ resize: 'vertical', fontFamily: 'inherit' }}
                     />
-                    {rows.length > 1 && (
-                      <div className="pm-bulk-description-actions">
-                        <button
-                          type="button"
-                          className="adm-btn-ghost pm-bulk-apply-description"
-                          onClick={() => applyDescriptionToAll(row.description)}
-                        >
-                          Apply to all selected products
-                        </button>
-                        <span>This copies this description to the other selected products before you save.</span>
-                      </div>
-                    )}
                   </label>
                 </div>
 
