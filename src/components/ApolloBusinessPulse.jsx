@@ -3,7 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const money = value => value === null || value === undefined || !Number.isFinite(Number(value))
   ? 'Unknown' : new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(Number(value));
 const when = value => value ? new Date(value).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }) : 'Never';
-const SOURCES = ['orders', 'searches', 'positill', 'memory', 'activeTime', 'live'];
+const duration = value => {
+  const seconds = Math.max(0, Math.round(Number(value) || 0));
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
+};
+const SOURCES = ['orders', 'searches', 'positill', 'memory', 'activeTime', 'baskets', 'live'];
+const INSIGHT_LABELS = { opportunity: 'Opportunity', conversion: 'Conversion', sales: 'Sales', engagement: 'Engagement', basket: 'Basket risk' };
 
 function mergeSources(previous, next) {
   const merged = { ...next };
@@ -91,6 +97,16 @@ export default function ApolloBusinessPulse() {
     <p className="oa-note">Live activity refreshes once a minute; reports every five minutes while visible. Custom ranges: up to 366 days.</p>
     {summary.error && <p role="alert">{summary.error}</p>}
     {summary.stale && data && <p role="status">Report refresh failed. The previous result for this period is shown.</p>}
+    <section className="oa-panel" aria-label="Apollo priorities">
+      <h3>Apollo priorities</h3>
+      <p className="oa-note">A joined business view built from the reporting sources below. It does not replace their detailed Analytics pages.</p>
+      {!data?.insights?.length && <p>Nothing recorded for this period yet.</p>}
+      {data?.insights?.map((insight, index) => <div key={`${insight.kind}-${index}`} className="oa-insight-card">
+        <strong>{INSIGHT_LABELS[insight.kind] || 'Insight'} · {insight.title}</strong>
+        <p>{insight.detail}</p>
+        <p className="oa-note">Evidence: {insight.source}</p>
+      </div>)}
+    </section>
     <Evidence title="Website orders" source={data?.orders}>
       <p>{data?.orders?.data?.orders} recorded orders · {money(data?.orders?.data?.revenue)} order value incl. VAT (cancelled orders excluded from value).</p>
       {data?.orders?.data?.productsComplete === false && <p role="status">Product rankings are incomplete: some recorded lines lack usable identifiers or quantities.</p>}
@@ -103,7 +119,14 @@ export default function ApolloBusinessPulse() {
     </Evidence>
     <Evidence title="Positill sales" source={data?.positill} />
     <Evidence title="Approved memory" source={data?.memory} />
-    <Evidence title="Active browsing time" source={data?.activeTime} />
+    <Evidence title="Active browsing time" source={data?.activeTime}>
+      <p>{duration(data?.activeTime?.data?.activeSeconds)} recorded across {data?.activeTime?.data?.recordedVisits} visits by {data?.activeTime?.data?.customers} signed-in customers.</p>
+      <p>Average engaged visit: {duration(data?.activeTime?.data?.averageSecondsPerVisit)}.</p>
+    </Evidence>
+    <Evidence title="Outstanding baskets" source={data?.baskets}>
+      <p>{data?.baskets?.data?.openBaskets} saved baskets · {data?.baskets?.data?.totalUnits} units · {money(data?.baskets?.data?.valueInclVat)} incl. VAT snapshot value.</p>
+      <p>{data?.baskets?.data?.coldBaskets} inactive for more than 30 days. Baskets are not sales.</p>
+    </Evidence>
     {live.stale && <p role="status">Live refresh failed. Customers below were active at the last successful read, not necessarily now.</p>}
     <Evidence title="Recently active customers" source={live.data?.live}>
       <p>{live.data?.live?.data?.count} signed-in customers active within {live.data?.live?.data?.freshnessSeconds} seconds of the successful read.</p>

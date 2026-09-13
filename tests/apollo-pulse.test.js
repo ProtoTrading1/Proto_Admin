@@ -52,14 +52,11 @@ test('valid empty reads are distinct from failed and unconnected sources', async
   assert.equal(failed.body.searches.status, 'available');
   assert.ok(!JSON.stringify(failed.body).includes('Private DB'));
 });
-test('activity reporting only uses the dedicated Apollo client after owner access', async () => {
+test('activity reporting reuses the existing portal visit ledger after owner access', async () => {
   let activityReads = 0;
-  const activity = { complete: false, estimated: true, activeSeconds: 0, sources: {
-    main: { status: 'unavailable' }, instore: { status: 'unavailable' },
-  } };
+  const activity = { complete: false, estimated: true, activeSeconds: 42, recordedVisits: 1, customers: 1 };
   const r = await run({ overrides: {
-    activityClient: () => ({ isolated: true }),
-    activityReader: async ({ client, window }) => { activityReads += 1; assert.equal(client.isolated, true); assert.equal(window.kind, 'day'); return activity; },
+    activityReader: async ({ db, window }) => { activityReads += 1; assert.ok(db.from); assert.equal(window.kind, 'day'); return activity; },
   } });
   assert.equal(activityReads, 1);
   assert.equal(r.body.activeTime.status, 'available');
@@ -68,15 +65,44 @@ test('activity reporting only uses the dedicated Apollo client after owner acces
 
   const blocked = await run({ overrides: {
     verify: async () => null,
-    activityClient: () => { throw new Error('must not be called'); },
+    activityReader: () => { throw new Error('must not be called'); },
   } });
   assert.equal(blocked.code, 401);
 });
-test('missing dedicated activity configuration is unavailable rather than zero', async () => {
-  const r = await run({ overrides: { activityClient: () => { throw new Error('not configured'); } } });
+test('unreadable portal visit data is unavailable rather than zero', async () => {
+  const r = await run({ overrides: { activityReader: () => { throw new Error('not configured'); } } });
   assert.equal(r.body.activeTime.status, 'unavailable');
   assert.equal(r.body.activeTime.data, null);
   assert.match(r.body.activeTime.reason, /could not be read/i);
+});
+test('portal visit activity is calculated from the same records used by Analytics', async () => {
+  const r = await run({ db: database({ customer_visits: [
+    { customer_id: 'a', session_id: 's1', started_at: '2026-09-12T11:00:00.000Z', last_seen_at: '2026-09-12T11:02:00.000Z' },
+    { customer_id: 'a', session_id: 's2', started_at: '2026-09-12T11:03:00.000Z', last_seen_at: '2026-09-12T11:04:00.000Z' },
+  ] }) });
+  assert.equal(r.body.activeTime.source, 'portal.customer_visits');
+  assert.equal(r.body.activeTime.data.recordedVisits, 2);
+  assert.equal(r.body.activeTime.data.customers, 1);
+  assert.equal(r.body.activeTime.data.activeSeconds, 180);
+});
+test('Apollo adds joined priorities without presenting website orders as Positill sales', async () => {
+  const r = await run({ db: database({
+    orders: [{ id: 'o1', status: 'submitted', total_ex_vat: 100, created_at: '2026-09-12T11:00:00.000Z' }],
+    search_analytics: [{ id: 's1', search_term: 'diary', results_found: 0, created_at: '2026-09-12T11:00:00.000Z' }],
+    customer_visits: [{ customer_id: 'a', session_id: 's1', started_at: '2026-09-12T11:00:00.000Z', last_seen_at: '2026-09-12T11:01:00.000Z' }],
+  }) });
+  assert.equal(r.body.insights[0].kind, 'opportunity');
+  assert.match(r.body.insights.find(row => row.kind === 'sales').detail, /not Positill sales/);
+  assert.equal(r.body.insights.find(row => row.kind === 'engagement').source, 'portal.customer_visits');
+});
+test('basket risk is an aggregated current snapshot and is never labelled as sales', async () => {
+  const r = await run({ db: database({ customer_account_carts: [
+    { customer_id: 'a', activity_at: Date.parse('2026-08-01T12:00:00.000Z'), items: [{ product: { sku: 'X', name: 'Item', price: 12.5 }, qty: 2 }] },
+  ] }) });
+  assert.equal(r.body.baskets.data.openBaskets, 1);
+  assert.equal(r.body.baskets.data.valueInclVat, 25);
+  assert.equal(r.body.baskets.data.coldBaskets, 1);
+  assert.match(r.body.insights.find(row => row.kind === 'basket').detail, /not sales/);
 });
 test('Apollo only exposes existing Positill data as explicitly enabled raw evidence', async () => {
   let calls = 0;
@@ -113,7 +139,8 @@ test('malformed search rows preserve valid evidence but mark the source incomple
   assert.equal(r.body.searches.complete, false);
   assert.equal(r.body.searches.data.recordedSearches, 3);
   assert.equal(r.body.searches.data.invalidRecords, 2);
-  assert.deepEqual(r.body.searches.data.topTerms, [{ term: 'beads', searches: 1, zeroResults: 1 }]);
+  assert.deepEqual(r.body.searches.data.topTerms, [{ term: 'beads', searches: 1, zeroResults: 1,
+    clicks: 0, cartAdds: 0, orders: 0, orderValue: 0 }]);
 });
 test('live shoppers join names and carts only for currently active customer ids', async () => {
   const r = await run({ query: { view: 'live' }, db: database({
