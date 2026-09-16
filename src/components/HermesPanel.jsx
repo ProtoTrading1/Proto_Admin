@@ -15,6 +15,13 @@ const FOUNDATIONS = [
     icon: ClipboardList,
     status: 'Shell ready',
   },
+  {
+    id: 'analytics',
+    title: 'Apollo Pulse',
+    description: 'Ask verified questions about customers, baskets, searches and sales.',
+    icon: Bot,
+    status: 'Preview ready',
+  },
 ];
 
 export default function HermesPanel({ onSelectSection }) {
@@ -32,8 +39,8 @@ export default function HermesPanel({ onSelectSection }) {
       </div>
 
       <div className="intelligence-callout" role="status">
-        <strong>The first authenticated intelligence lookup is connected.</strong>
-        <span>Product Intelligence can now join available Positill and website data. Sales, incoming stock and saved buying decisions remain staged for later phases.</span>
+        <strong>Hermes now has two working intelligence entry points.</strong>
+        <span>Use Product Intelligence for a code-level operational lookup, or Apollo Pulse in Analytics for verified business questions. Buying workflows remain staged until their import and approval contracts are ready.</span>
       </div>
 
       <div className="intelligence-launch-grid">
@@ -59,3 +66,4 @@ export default function HermesPanel({ onSelectSection }) {
     </section>
   );
 }
+
