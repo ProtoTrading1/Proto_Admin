@@ -2,7 +2,7 @@ import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readPositillEvidence } from '../lib/apollo-positill-evidence.mjs';
 
-const window = { kind: 'day', start: '2026-09-11T22:00:00.000Z', end: '2026-09-12T22:00:00.000Z', timezone: 'Africa/Johannesburg' };
+const window = { kind: 'day', start: '2026-09-11T22:00:00.000Z', end: '2026-09-12T12:00:00.000Z', timezone: 'Africa/Johannesburg', periodToDate: true };
 const checkedAt = '2026-09-12T12:00:00.000Z';
 
 test('does not call the existing bridge while evidence is disabled', async () => {
@@ -18,6 +18,14 @@ test('rejects windows whose semantics cannot be expressed by the existing bridge
   const result = await readPositillEvidence({ window: { ...window, kind: 'week' }, checkedAt, enabled: true, fetchTopSellers: async () => { calls += 1; } });
   assert.equal(calls, 0);
   assert.match(result.reason, /week, month, or custom/i);
+});
+
+test('does not show the bridge today snapshot for a past or non-current day window', async () => {
+  let calls = 0;
+  const past = { ...window, start: '2026-09-10T22:00:00.000Z', end: '2026-09-11T22:00:00.000Z' };
+  const result = await readPositillEvidence({ window: past, checkedAt, enabled: true, fetchTopSellers: async () => { calls += 1; } });
+  assert.equal(calls, 0);
+  assert.equal(result.status, 'unavailable');
 });
 
 test('returns raw line evidence without claiming sales, VAT, credits, or reconciliation', async () => {
@@ -41,3 +49,4 @@ test('makes a bridge failure unavailable rather than returning zeros or diagnost
   assert.equal(result.data, null);
   assert.ok(!JSON.stringify(result).includes('private bridge'));
 });
+
