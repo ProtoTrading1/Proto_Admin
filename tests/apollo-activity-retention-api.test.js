@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createActivityRetentionHandler } from '../api/apollo-activity-retention.js';
 
 function request(method = 'POST', { headers = {}, body } = {}) { return { method, headers, body }; }
@@ -26,10 +27,50 @@ describe('Apollo activity retention endpoint', () => {
     const client = vi.fn(); const owner = vi.fn();
     for (const req of [request('GET'), request('POST', { body: { force: true } })]) {
       const res = response(); await handler({ client, requireOwnerAccess: owner })(req, res);
-      expect(res.status).toHaveBeenCalledWith(req.method === 'GET' ? 405 : 400);
+      expect(res.status).toHaveBeenCalledWith(req.method === 'GET' ? 401 : req.method === 'POST' ? 400 : 405);
     }
     expect(owner).not.toHaveBeenCalled();
     expect(client).not.toHaveBeenCalled();
+  });
+
+  it('requires the Vercel cron bearer secret for scheduled GET requests', async () => {
+    const owner = vi.fn(); const client = vi.fn();
+    const target = handler({ cronSecret: () => 'expected-cron-secret', requireOwnerAccess: owner, client });
+    const denied = response();
+    await target(request('GET', { headers: { authorization: 'Bearer wrong-secret' } }), denied);
+    expect(denied.status).toHaveBeenCalledWith(401);
+    expect(owner).not.toHaveBeenCalled();
+    expect(client).not.toHaveBeenCalled();
+
+    const rpc = vi.fn(async () => ({ data: { raw_removed: 0, monthly_removed: 0 }, error: null }));
+    const accepted = response();
+    await handler({ cronSecret: () => 'expected-cron-secret', requireOwnerAccess: owner, client: () => ({ rpc }) })(
+      request('GET', { headers: { authorization: 'Bearer expected-cron-secret' } }), accepted,
+    );
+    expect(accepted.status).toHaveBeenCalledWith(200);
+    expect(rpc).toHaveBeenCalledWith('apollo_retain_activity');
+  });
+
+  it('uses Vercel CRON_SECRET by default and has one daily UTC schedule', async () => {
+    const oldSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = 'vercel-cron-secret';
+    try {
+      const rpc = vi.fn(async () => ({ data: { raw_removed: 0, monthly_removed: 0 }, error: null }));
+      const res = response();
+      await createActivityRetentionHandler({ enabled: () => true, client: () => ({ rpc }), requireOwnerAccess: vi.fn() })(
+        request('GET', { headers: { authorization: 'Bearer vercel-cron-secret' } }), res,
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(rpc).toHaveBeenCalledOnce();
+
+      const config = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+      expect(config.crons.filter(row => row.path === '/api/apollo-activity-retention')).toEqual([
+        { path: '/api/apollo-activity-retention', schedule: '30 1 * * *' },
+      ]);
+    } finally {
+      if (oldSecret === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = oldSecret;
+    }
   });
 
   it('requires an owner when no dedicated retention cron secret is supplied', async () => {
@@ -64,3 +105,4 @@ describe('Apollo activity retention endpoint', () => {
     }
   });
 });
+
