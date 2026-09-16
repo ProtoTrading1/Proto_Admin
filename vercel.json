@@ -142,6 +142,11 @@
     {
       "path": "/api/site-config-backup",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/apollo-activity-retention",
+      "schedule": "30 1 * * *"
     }
   ]
 }
+
