@@ -178,7 +178,7 @@ export default function ApolloBusinessPulse() {
     stale: memoryFeed.stale, data: { records: memoryFeed.data.memories || [], limitations: ['Only approved revisions are eligible for answers; changing sales facts remain in live reports.'] },
   } : { source: 'Apollo memory revision database', status: 'unavailable', data: null, reason: memoryFeed.error || 'Memory is disabled or not configured.' };
   if (denied) return <p role="alert">Owner access is required. Sign in again to load Apollo.</p>;
-  return <section aria-labelledby="apollo-title">
+  return <section className="apollo-pulse" aria-labelledby="apollo-title">
     <h2 id="apollo-title">Apollo Business Pulse</h2>
     <p>Read-only preview. Website order value is not Positill sales. All times are South African.</p>
     <div className="oa-toolbar">
