@@ -24,6 +24,11 @@ describe('Apollo memory API contract', () => {
     }
     expect(client).not.toHaveBeenCalled();
   });
+  it('rejects an unknown memory view before client creation', async () => {
+    const client = vi.fn(); const response = res();
+    await createMemoryHandler({ verify: vi.fn(async () => user), owner: () => true, client, enabled: () => true })(Object.assign(req('GET'), { query: { view: 'all-users' } }), response);
+    expect(response.status).toHaveBeenCalledWith(400); expect(client).not.toHaveBeenCalled();
+  });
   it('rejects array body without RPC', async () => { const rpc = vi.fn(); const response = res(); await createMemoryHandler({ verify: vi.fn(async () => user), owner: () => true, client: () => ({ rpc }), enabled: () => true })(req('POST', []), response); expect(response.status).toHaveBeenCalledWith(400); expect(rpc).not.toHaveBeenCalled(); });
   it('returns only reviewed current memory content on a successful read', async () => {
     const revisions = [row, { ...row, version: 2, state: 'draft', body: 'Unreviewed' }];
@@ -34,12 +39,23 @@ describe('Apollo memory API contract', () => {
     expect(rpc).toHaveBeenCalledWith('apollo_read_memory', { p_after_key: null, p_limit: 50 });
     expect(response.json).toHaveBeenCalledWith({ memories: [], nextCursor: null });
   });
+  it('returns complete owner-only revisions for the management view while keeping approved retrieval separate', async () => {
+    const revisions = [row, { ...row, version: 2, state: 'draft', body: 'Pending review' }];
+    const rpc = vi.fn(async () => ({ data: revisions, error: null }));
+    const response = res();
+    await createMemoryHandler({ verify: vi.fn(async () => user), owner: () => true, client: () => ({ rpc }), enabled: () => true })(Object.assign(req('GET'), { query: { view: 'manage' } }), response);
+    expect(response.status).toHaveBeenCalledWith(200);
+    const payload = response.json.mock.calls[0][0];
+    expect(payload.memories).toEqual([]);
+    expect(payload.revisions.map(item => [item.version, item.state])).toEqual([[1, 'approved'], [2, 'draft']]);
+  });
   it('uses a key cursor without splitting a selected revision history', async () => {
     const revisions = [{ ...row, key: 'next', title: 'Next', version: 1 }, { ...row, key: 'next', title: 'Next revised', version: 2 }];
     const rpc = vi.fn(async () => ({ data: revisions, error: null }));
     const response = res(); const request = Object.assign(req('GET'), { query: { cursor: 'k', limit: '1' } });
     await createMemoryHandler({ verify: vi.fn(async () => user), owner: () => true, client: () => ({ rpc }), enabled: () => true })(request, response);
     expect(rpc).toHaveBeenCalledWith('apollo_read_memory', { p_after_key: 'k', p_limit: 1 });
-    expect(response.json).toHaveBeenCalledWith({ memories: [{ key: 'next', kind: 'definition', title: 'Next revised', body: 'B', evidenceRefs: ['r'], version: 2, state: 'approved' }], nextCursor: 'next' });
+    expect(response.json).toHaveBeenCalledWith({ memories: [{ key: 'next', kind: 'definition', title: 'Next revised', body: 'B', evidenceRefs: ['r'], version: 2, state: 'approved', reviewer: user.id }], nextCursor: 'next' });
   });
 });
+
