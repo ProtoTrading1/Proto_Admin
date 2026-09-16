@@ -43,17 +43,18 @@ export function createActivityRetentionHandler({
   enabled = () => process.env.APOLLO_ACTIVITY_RETENTION_ENABLED === 'true',
   client = getApolloActivityRetentionClient,
   requireOwnerAccess = requireOwner,
-  cronSecret = () => String(process.env.APOLLO_ACTIVITY_RETENTION_CRON_SECRET || '').trim(),
+  cronSecret = () => String(process.env.APOLLO_ACTIVITY_RETENTION_CRON_SECRET || process.env.CRON_SECRET || '').trim(),
 } = {}) {
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
     if (!enabled()) return res.status(404).json({ error: 'Apollo activity retention is not enabled' });
-    if (req.body != null && (typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).length !== 0)) {
+    if (req.method === 'POST' && req.body != null && (typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).length !== 0)) {
       return res.status(400).json({ error: 'Retention does not accept a request payload' });
     }
 
     const isCron = retentionCronAuthorised(req, cronSecret());
+    if (req.method === 'GET' && !isCron) return res.status(401).json({ error: 'Cron authorization required' });
     if (!isCron && !(await requireOwnerAccess(req, res))) return;
 
     let db;
@@ -71,3 +72,4 @@ export function createActivityRetentionHandler({
 }
 
 export default createActivityRetentionHandler();
+
