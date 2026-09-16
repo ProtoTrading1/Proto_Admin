@@ -13,11 +13,13 @@ function parseReadOptions(query = {}) {
   const version = query?.version;
   const cursor = query?.cursor;
   const limit = query?.limit;
+  const view = query?.view ?? 'approved';
   if (q != null && (typeof q !== 'string' || q.length > 240)) throw new Error('Invalid memory query');
   if (version != null && (!/^\d+$/.test(String(version)) || Number(version) < 1 || Number(version) > 2147483647)) throw new Error('Invalid memory version');
   if (cursor != null && (typeof cursor !== 'string' || !MEMORY_KEY.test(cursor))) throw new Error('Invalid memory cursor');
   if (limit != null && (!/^\d+$/.test(String(limit)) || Number(limit) < 1 || Number(limit) > MAX_PAGE_SIZE)) throw new Error('Invalid memory page size');
-  return { query: q || '', version: version == null ? null : Number(version), cursor: cursor || null, limit: limit == null ? DEFAULT_PAGE_SIZE : Number(limit) };
+  if (!['approved', 'manage'].includes(view)) throw new Error('Invalid memory view');
+  return { query: q || '', version: version == null ? null : Number(version), cursor: cursor || null, limit: limit == null ? DEFAULT_PAGE_SIZE : Number(limit), view };
 }
 export function getApolloMemoryClient() {
   const url = String(process.env.APOLLO_MEMORY_SUPABASE_URL || '').trim();
@@ -49,7 +51,9 @@ export function createMemoryHandler({ verify = verifyAdminUser, owner = isOwnerE
         const memories = retrieveApprovedMemories(records, readOptions);
         const keys = [...new Set(records.map(({ key }) => key))];
         const nextCursor = keys.length === readOptions.limit ? keys.at(-1) : null;
-        return res.status(200).json({ memories: memories.map(({ key, kind, title, body, evidenceRefs, version, state }) => ({ key, kind, title, body, evidenceRefs, version, state })), nextCursor });
+        const response = { memories: memories.map(({ key, kind, title, body, evidenceRefs, version, state, reviewer }) => ({ key, kind, title, body, evidenceRefs, version, state, reviewer })), nextCursor };
+        if (readOptions.view === 'manage') response.revisions = records;
+        return res.status(200).json(response);
       }
       if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || JSON.stringify(req.body).length > MAX_BODY) return res.status(400).json({ error: 'Invalid memory payload' });
       const { expectedVersion, ...payload } = req.body;
@@ -63,3 +67,4 @@ export function createMemoryHandler({ verify = verifyAdminUser, owner = isOwnerE
 }
 
 export default createMemoryHandler();
+
