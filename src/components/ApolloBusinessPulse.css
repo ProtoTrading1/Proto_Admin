@@ -5,12 +5,17 @@
 .apollo-pulse .oa-insight-card { overflow-wrap: anywhere; }
 .apollo-pulse details { border-top: 1px solid #e5e7eb; padding: 10px 0; }
 .apollo-pulse details summary { cursor: pointer; font-weight: 700; }
+.apollo-pulse label { display: grid; gap: 6px; min-width: 0; }
+.apollo-pulse input, .apollo-pulse select, .apollo-pulse textarea { max-width: 100%; min-width: 0; }
+.apollo-pulse .adm-input { width: 100%; box-sizing: border-box; }
 @media (max-width: 640px) {
   .apollo-pulse { gap: 12px; }
   .apollo-pulse .oa-toolbar { display: grid; grid-template-columns: 1fr; gap: 10px; }
   .apollo-pulse .oa-toolbar > label,
   .apollo-pulse .oa-toolbar > input,
   .apollo-pulse .oa-toolbar > button { width: 100%; min-width: 0; }
+  .apollo-pulse input, .apollo-pulse select, .apollo-pulse textarea,
+  .apollo-pulse button { min-height: 44px; font-size: 16px; }
   .apollo-pulse .oa-panel { padding: 14px; }
   .apollo-pulse h2 { font-size: clamp(24px, 7vw, 32px); line-height: 1.1; }
   .apollo-pulse h3 { font-size: 18px; }
