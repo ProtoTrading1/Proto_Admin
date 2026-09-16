@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { answerApolloQuestion } from '../../lib/apollo-qa.mjs';
+import './ApolloBusinessPulse.css';
 
 const money = value => value === null || value === undefined || !Number.isFinite(Number(value))
   ? 'Unknown' : new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(Number(value));
