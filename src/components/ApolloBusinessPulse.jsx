@@ -15,6 +15,12 @@ const duration = value => {
 const SOURCES = ['orders', 'searches', 'positill', 'memory', 'activeTime', 'baskets', 'live'];
 const INSIGHT_LABELS = { opportunity: 'Opportunity', conversion: 'Conversion', orders: 'Order flow', engagement: 'Engagement', basket: 'Basket risk' };
 const EMPTY_MEMORY_FORM = { key: '', kind: 'definition', title: '', body: '', evidenceRefs: '', state: 'draft', expectedVersion: 0 };
+const QUICK_QUESTIONS = [
+  'Who is online now?',
+  'What are the best sellers today?',
+  'What are customers searching for?',
+  'Which searches found no results?',
+];
 
 function latestMemoryRevisions(records = []) {
   const latest = new Map();
@@ -84,6 +90,12 @@ function Evidence({ title, source, children }) {
     {source?.data == null ? <p>Unavailable — {source?.reason || 'not loaded yet'}.</p> : children}
     {source?.data?.limitations?.map(note => <p className="oa-note" key={note}>{note}</p>)}
   </section>;
+}
+
+function SourceState({ source }) {
+  const state = source?.stale ? 'stale' : source?.status || 'unavailable';
+  const label = state === 'available' ? 'Verified' : state === 'partial' ? 'Partial' : state === 'stale' ? 'Stale' : 'Unavailable';
+  return <span className={`oa-source-state oa-source-state--${state}`}>{label}</span>;
 }
 
 function Comparison({ comparison, metrics }) {
@@ -172,14 +184,17 @@ export default function ApolloBusinessPulse() {
     setMemoryForm(current => ({ ...current, key: value, expectedVersion: existing?.version || 0 }));
   };
   const data = summary.data;
-  const askApollo = event => {
-    event.preventDefault();
-    setAnswer(answerApolloQuestion(question, {
+  const askQuestion = value => {
+    const nextQuestion = String(value || '').trim();
+    if (!nextQuestion) return;
+    setQuestion(nextQuestion);
+    setAnswer(answerApolloQuestion(nextQuestion, {
       report: data ? { ...data, stale: summary.stale } : null,
       liveReport: live.data ? { ...live.data, stale: live.stale } : null,
       selectedPeriod: period,
     }));
   };
+  const askApollo = event => { event.preventDefault(); askQuestion(question); };
   const memorySource = memoryFeed.data ? {
     source: 'Apollo memory revision database', status: 'available', lastSuccessfulAt: memoryFeed.refreshedAt,
     stale: memoryFeed.stale, data: { records: memoryFeed.data.memories || [], limitations: ['Only approved revisions are eligible for answers; changing sales facts remain in live reports.'] },
@@ -199,6 +214,27 @@ export default function ApolloBusinessPulse() {
     <p className="oa-note">Live activity refreshes once a minute; reports every five minutes while visible. Custom ranges: up to 366 days.</p>
     {summary.error && <p role="alert">{summary.error}</p>}
     {summary.stale && data && <p role="status">Report refresh failed. The previous result for this period is shown.</p>}
+    <section className="oa-today" aria-labelledby="apollo-today-title">
+      <div className="oa-section-heading">
+        <div><p className="oa-eyebrow">OPERATING NOW</p><h3 id="apollo-today-title">Today at a glance</h3></div>
+        <SourceState source={summary.stale ? { stale: true } : data?.orders} />
+      </div>
+      <div className="oa-metric-grid">
+        <button type="button" className="oa-metric" onClick={() => askQuestion('Who is online now?')}>
+          <span>Online now</span><strong>{live.data?.live?.data?.count ?? '—'}</strong><small>signed-in customers · <SourceState source={live.data?.live} /></small>
+        </button>
+        <button type="button" className="oa-metric" onClick={() => askQuestion('What baskets need attention?')}>
+          <span>Open baskets</span><strong>{data?.baskets?.data?.openBaskets ?? '—'}</strong><small>{money(data?.baskets?.data?.valueInclVat)} snapshot value</small>
+        </button>
+        <button type="button" className="oa-metric" onClick={() => askQuestion('What is the website order value today?')}>
+          <span>Website orders</span><strong>{money(data?.orders?.data?.revenue)}</strong><small>{data?.orders?.data?.orders ?? '—'} recorded · not Positill sales</small>
+        </button>
+        <button type="button" className="oa-metric" onClick={() => askQuestion('What are customers searching for?')}>
+          <span>Search demand</span><strong>{data?.searches?.data?.recordedSearches ?? '—'}</strong><small>{data?.searches?.data?.zeroResultSearches ?? '—'} no-result searches</small>
+        </button>
+      </div>
+      <p className="oa-note">Select a card to see the supporting report. Every total below retains its source, period and freshness.</p>
+    </section>
     <section className="oa-panel" aria-labelledby="apollo-ask-title">
       <h3 id="apollo-ask-title">Ask Apollo</h3>
       <p className="oa-note">Answers use the owner-only reports shown below for the selected period. Questions are processed in this page and are not saved or sent to an AI provider.</p>
@@ -209,6 +245,9 @@ export default function ApolloBusinessPulse() {
           <button type="submit" disabled={!question.trim()}>Ask</button>
         </div>
       </form>
+      <div className="oa-quick-questions" aria-label="Suggested Apollo questions">
+        {QUICK_QUESTIONS.map(item => <button type="button" key={item} onClick={() => askQuestion(item)}>{item}</button>)}
+      </div>
       {answer && <div role="status" aria-live="polite" className="oa-insight-card">
         <strong>{answer.status === 'answered' ? 'Apollo answer' : answer.status === 'needs_period' ? 'Change the period' : answer.status === 'partial' ? 'Partial evidence' : 'Unavailable / unsupported'}</strong>
         <p>{answer.answer}</p>
@@ -318,4 +357,3 @@ export default function ApolloBusinessPulse() {
     </Evidence>
   </section>;
 }
-
