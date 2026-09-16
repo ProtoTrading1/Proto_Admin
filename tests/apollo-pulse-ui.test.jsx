@@ -96,6 +96,26 @@ it('answers a supported question from the loaded report and discloses local-only
   expect(container.textContent).toContain('bead 861');
   expect(container.textContent).toContain('Source: synthetic');
 });
+it('offers saved operating views, transparent source confidence, and a read-only action queue', async () => {
+  await render();
+  expect(container.textContent).toContain('Data confidence');
+  expect(container.textContent).toContain('Website orders');
+  expect(container.textContent).toContain('Live customers');
+  expect(container.textContent).toContain('Action queue');
+  expect(container.textContent).toContain('no-result search');
+  expect(container.textContent).toContain('cannot send messages, change orders, prices or stock');
+  const instoreDemand = [...container.querySelectorAll('button')].find(button => button.textContent === 'Instore demand');
+  await act(async () => instoreDemand.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(container.querySelector('#apollo-question').value).toContain('Instore searches');
+  expect(container.textContent).toContain('This week');
+});
+it('routes an action-queue review through Apollo instead of changing customer or order data', async () => {
+  await render();
+  const review = [...container.querySelectorAll('button')].find(button => button.textContent === 'Review');
+  await act(async () => review.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(container.querySelector('#apollo-question').value).toBe('Which searches found no results?');
+  expect(fetch.mock.calls.filter(([url, options]) => String(url) === '/api/apollo-memory' && options.method === 'POST')).toHaveLength(0);
+});
 it('explains when recorded promotion discounts are included in website order value', async () => {
   discountScenario = true;
   await render();
@@ -135,4 +155,3 @@ it('clears customer and summary details when authorisation expires', async () =>
   expect(container.textContent).not.toContain('Synthetic Customer');
   expect(container.textContent).not.toContain('2 recorded orders');
 });
-
