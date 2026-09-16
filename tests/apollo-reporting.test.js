@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateWebsiteOrders, evidenceEnvelope, normalizePositillRows, paginateSelect, reconcileByReference, reportingWindow } from '../lib/apollo-reporting.mjs';
+import { aggregateWebsiteOrders, evidenceEnvelope, normalizePositillRows, paginateSelect, previousReportingWindow, reconcileByReference, reportingWindow } from '../lib/apollo-reporting.mjs';
 
 describe('Apollo reporting foundation', () => {
   it('builds deterministic SAST windows', () => {
     expect(reportingWindow('custom', { start: '2026-09-01', end: '2026-09-01' })).toMatchObject({ start: '2026-08-31T22:00:00.000Z', end: '2026-09-01T22:00:00.000Z' });
-    expect(reportingWindow('month', { now: '2026-09-12T12:00:00Z' })).toMatchObject({ start: '2026-08-31T22:00:00.000Z', end: '2026-09-30T22:00:00.000Z' });
+    expect(reportingWindow('month', { now: '2026-09-12T12:00:00Z' })).toMatchObject({ start: '2026-08-31T22:00:00.000Z', end: '2026-09-12T12:00:00.000Z', periodToDate: true });
   });
   it('keeps unknown evidence distinct from zero', () => {
     expect(evidenceEnvelope({ value: null, source: 'POSWINSQL' })).toMatchObject({ value: null, known: false });
@@ -18,6 +18,13 @@ describe('Apollo reporting foundation', () => {
     expect(aggregateWebsiteOrders([{ status: 'paid', total_ex_vat: 115, final_items: [{ variant_sku: 'V1', parent_sku: 'P1', qty: 2 }] }])).toMatchObject({ orders: 1, revenue: 115, statuses: { 'payment received': 1 }, products: [{ key: 'V1', parentKey: 'P1', units: 2 }] });
     expect(aggregateWebsiteOrders([{ status: 'cancelled', total_ex_vat: 115 }]).statuses).toEqual({ cancelled: 1 });
   });
+  it('subtracts the recorded VAT-inclusive promotion discount from order value', () => {
+    expect(aggregateWebsiteOrders([
+      { status: 'pending', total_ex_vat: 115, discount_amount: 15, final_items: [] },
+      { status: 'pending', total_ex_vat: 50, discount_amount: 80, final_items: [] },
+      { status: 'pending', total_ex_vat: 20, final_items: [] },
+    ])).toMatchObject({ orders: 3, revenue: 120, discountsInclVat: 65, revenueKnown: true });
+  });
   it('rejects unknown POS semantics and reconciles by reference only', () => {
     expect(() => normalizePositillRows([{ type: 'invoice', amount: 10 }], { taxBasis: 'unknown' })).toThrow(/tax basis/i);
     expect(normalizePositillRows([{ type: 'credit_note', amount: -10, quantity: -1 }], { taxBasis: 'incl_vat', typeSigns: { credit_note: -1 }, amountSignConvention: 'as_stored' })[0].amount).toBe(-10);
@@ -28,11 +35,36 @@ describe('Apollo reporting foundation', () => {
     expect(reportingWindow('week', { now: '2026-09-13T22:30:00Z' }).start).toBe('2026-09-13T22:00:00.000Z');
     expect(() => reportingWindow('custom', { start: '2026-02-30', end: '2026-03-02' })).toThrow();
   });
+  it('builds a like-for-like previous SAST window for day, week, month and custom ranges', () => {
+    expect(previousReportingWindow(reportingWindow('day', { now: '2026-09-15T12:00:00Z' })))
+      .toMatchObject({ start: '2026-09-13T22:00:00.000Z', end: '2026-09-14T12:00:00.000Z', comparisonBasis: 'matching_period_to_date' });
+    expect(previousReportingWindow(reportingWindow('week', { now: '2026-09-15T12:00:00Z' })))
+      .toMatchObject({ start: '2026-09-06T22:00:00.000Z', end: '2026-09-08T12:00:00.000Z', comparisonBasis: 'matching_period_to_date' });
+    expect(previousReportingWindow(reportingWindow('month', { now: '2026-09-15T12:00:00Z' })))
+      .toMatchObject({ start: '2026-07-31T22:00:00.000Z', end: '2026-08-15T12:00:00.000Z', comparisonBasis: 'matching_period_to_date' });
+    const custom = reportingWindow('custom', { start: '2026-09-03', end: '2026-09-05' });
+    expect(previousReportingWindow(custom)).toMatchObject({ start: '2026-08-30T22:00:00.000Z', end: '2026-09-02T22:00:00.000Z' });
+    expect(() => previousReportingWindow({ kind: 'custom', start: '2026-09-01', end: '2026-09-02' })).toThrow();
+  });
   it('never turns null or blank monetary evidence into zero', () => {
     for (const total_ex_vat of [null, undefined, '', 'bad', Infinity]) {
       expect(aggregateWebsiteOrders([{ total_ex_vat }]).revenue).toBeNull();
     }
     expect(aggregateWebsiteOrders([]).revenue).toBe(0);
+  });
+  it('fails closed for malformed or negative discounts instead of overstating order value', () => {
+    for (const discount_amount of ['bad', -1, Infinity]) {
+      expect(aggregateWebsiteOrders([{ total_ex_vat: 115, discount_amount, final_items: [] }]))
+        .toMatchObject({ revenue: null, revenueKnown: false, complete: false });
+    }
+    expect(aggregateWebsiteOrders([{ total_ex_vat: -1, final_items: [] }]))
+      .toMatchObject({ revenue: null, revenueKnown: false, complete: false });
+  });
+  it('does not silently classify unknown order states as pending or include them in totals', () => {
+    expect(aggregateWebsiteOrders([
+      { status: 'awaiting payment', total_ex_vat: 40, final_items: [] },
+      { status: 'mystery state', total_ex_vat: 90, final_items: [{ code: 'X', qty: 1 }] },
+    ])).toMatchObject({ orders: 2, unknownStatusOrders: 1, statusContractComplete: false, revenue: null, complete: false, statuses: { 'order in progress': 1, unrecognized: 1 } });
   });
   it('honours final empty items and handles nested legacy product shapes', () => {
     const summary = aggregateWebsiteOrders([{ total_ex_vat: 25, items: [{ product: { sku: 'BLUE', price: 12.5 }, qty: 2 }] }]);
@@ -74,3 +106,4 @@ describe('Apollo reporting foundation', () => {
     expect(() => normalizePositillRows([], { taxBasis: 'incl_vat' })).toThrow();
   });
 });
+
