@@ -113,6 +113,8 @@ export default function ApolloBusinessPulse() {
   const [memoryForm, setMemoryForm] = useState(EMPTY_MEMORY_FORM);
   const [memorySaving, setMemorySaving] = useState(false);
   const [memoryNotice, setMemoryNotice] = useState('');
+  const memoryFormRef = useRef(null);
+  const memoryTitleRef = useRef(null);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState(null);
   const onDenied = useCallback(() => setDenied(true), []);
@@ -160,6 +162,10 @@ export default function ApolloBusinessPulse() {
     setMemoryForm({ key: record.key, kind: record.kind, title: record.title, body: record.body,
       evidenceRefs: (record.evidenceRefs || []).join('\n'), state: 'draft', expectedVersion: record.version });
     setMemoryNotice('Editing the latest revision. Choose Draft to propose it, or explicitly approve it when reviewed.');
+    requestAnimationFrame(() => {
+      memoryFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      memoryTitleRef.current?.focus({ preventScroll: true });
+    });
   };
   const changeMemoryKey = value => {
     const existing = latestMemoryRevisions(memoryPage.records).find(record => record.key === value.trim());
@@ -272,7 +278,7 @@ export default function ApolloBusinessPulse() {
       </article>)}
       {memoryPage.error && <p role="alert">{memoryPage.error}</p>}
       {memoryPage.nextCursor && <button type="button" onClick={loadMoreMemory} disabled={memoryPage.loading}>{memoryPage.loading ? 'Loading…' : 'Load more memory records'}</button>}
-      <form onSubmit={saveMemory} className="oa-panel" aria-label="Author Apollo memory" style={{ marginTop: 14 }}>
+      <form ref={memoryFormRef} onSubmit={saveMemory} className="oa-panel" aria-label="Author Apollo memory" style={{ marginTop: 14 }}>
         <h4>Record a business definition or decision</h4>
         <p className="oa-note">Memory is versioned and owner-only. Evidence is required. Saving does not change live sales facts or approve a draft automatically.</p>
         <div className="oa-toolbar">
@@ -280,7 +286,7 @@ export default function ApolloBusinessPulse() {
           <label>Type <select value={memoryForm.kind} onChange={event => setMemoryForm(current => ({ ...current, kind: event.target.value }))}><option value="definition">Definition</option><option value="decision">Decision</option></select></label>
           <label>Review state <select value={memoryForm.state} onChange={event => setMemoryForm(current => ({ ...current, state: event.target.value }))}><option value="draft">Draft</option><option value="approved">Approve this revision</option><option value="superseded">Superseded</option><option value="rejected">Rejected</option></select></label>
         </div>
-        <label>Title <input className="adm-input" required maxLength={240} value={memoryForm.title} onChange={event => setMemoryForm(current => ({ ...current, title: event.target.value }))} /></label>
+        <label>Title <input ref={memoryTitleRef} className="adm-input" required maxLength={240} value={memoryForm.title} onChange={event => setMemoryForm(current => ({ ...current, title: event.target.value }))} /></label>
         <label>Definition / decision <textarea className="adm-input" required maxLength={10000} rows={4} value={memoryForm.body} onChange={event => setMemoryForm(current => ({ ...current, body: event.target.value }))} /></label>
         <label>Evidence references (one per line) <textarea className="adm-input" required maxLength={10000} rows={3} value={memoryForm.evidenceRefs} onChange={event => setMemoryForm(current => ({ ...current, evidenceRefs: event.target.value }))} placeholder="Report, policy, or decision record" /></label>
         <p className="oa-note">Expected current version: {memoryForm.expectedVersion}. Existing records create a new revision; they are never overwritten.</p>
