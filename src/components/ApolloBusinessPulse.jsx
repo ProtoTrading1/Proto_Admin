@@ -21,6 +21,12 @@ const QUICK_QUESTIONS = [
   'What are customers searching for?',
   'Which searches found no results?',
 ];
+const SAVED_VIEWS = [
+  { key: 'today', label: 'Today', period: 'day', question: 'Who is online now?' },
+  { key: 'week', label: 'This week', period: 'week', question: 'What are customers searching for?' },
+  { key: 'instore', label: 'Instore demand', period: 'week', question: 'What are the Instore searches this week?' },
+  { key: 'reconciliation', label: 'Sales reconciliation', period: 'month', question: 'What Positill data is available this month?' },
+];
 
 function latestMemoryRevisions(records = []) {
   const latest = new Map();
@@ -96,6 +102,37 @@ function SourceState({ source }) {
   const state = source?.stale ? 'stale' : source?.status || 'unavailable';
   const label = state === 'available' ? 'Verified' : state === 'partial' ? 'Partial' : state === 'stale' ? 'Stale' : 'Unavailable';
   return <span className={`oa-source-state oa-source-state--${state}`}>{label}</span>;
+}
+
+function DataConfidence({ report, liveReport }) {
+  const sources = [
+    ['Website orders', report?.orders], ['Searches', report?.searches], ['Baskets', report?.baskets],
+    ['Live customers', liveReport?.live], ['Positill', report?.positill],
+  ];
+  return <section className="oa-confidence oa-panel" aria-labelledby="apollo-confidence-title">
+    <div className="oa-section-heading"><div><p className="oa-eyebrow">REPORTING QUALITY</p><h3 id="apollo-confidence-title">Data confidence</h3></div></div>
+    <p className="oa-note">Apollo never turns an unavailable feed into a zero. Each source below is shown with its current reporting state.</p>
+    <div className="oa-confidence-grid">{sources.map(([label, source]) => <div className="oa-confidence-item" key={label}>
+      <span>{label}</span><SourceState source={source} />
+      <small>{source?.lastSuccessfulAt ? `Updated ${when(source.lastSuccessfulAt)}` : source?.reason || 'Waiting for a successful read'}</small>
+    </div>)}</div>
+  </section>;
+}
+
+function ActionQueue({ report, onAsk }) {
+  const zeroResults = Number(report?.searches?.data?.comparison?.metrics?.zeroResultSearches?.current ?? report?.searches?.data?.topTerms?.reduce((total, term) => total + Number(term.zeroResults || 0), 0) ?? 0);
+  const coldBaskets = Number(report?.baskets?.data?.coldBaskets || 0);
+  const actions = [
+    zeroResults > 0 && { title: `${zeroResults} no-result search${zeroResults === 1 ? '' : 'es'}`, detail: 'Review catalogue wording, synonyms or buying opportunity. No customer is contacted automatically.', question: 'Which searches found no results?' },
+    coldBaskets > 0 && { title: `${coldBaskets} inactive basket${coldBaskets === 1 ? '' : 's'}`, detail: 'Review basket context before deciding on any manual follow-up.', question: 'What baskets need attention?' },
+    report?.positill?.status !== 'available' && { title: 'Positill sales need verification', detail: 'Keep website order value separate until dated Positill invoice reporting is connected and reconciled.', question: 'What Positill data is available this month?' },
+  ].filter(Boolean);
+  return <section className="oa-action-queue oa-panel" aria-labelledby="apollo-actions-title">
+    <div className="oa-section-heading"><div><p className="oa-eyebrow">OWNER REVIEW</p><h3 id="apollo-actions-title">Action queue</h3></div><span className="oa-queue-count">{actions.length}</span></div>
+    <p className="oa-note">Suggestions only. Apollo cannot send messages, change orders, prices or stock.</p>
+    {actions.length ? actions.map(action => <article className="oa-action" key={action.title}><div><strong>{action.title}</strong><p>{action.detail}</p></div><button type="button" onClick={() => onAsk(action.question)}>Review</button></article>)
+      : <p>No verified owner action needs attention for this period.</p>}
+  </section>;
 }
 
 function Comparison({ comparison, metrics }) {
@@ -195,6 +232,10 @@ export default function ApolloBusinessPulse() {
     }));
   };
   const askApollo = event => { event.preventDefault(); askQuestion(question); };
+  const selectSavedView = view => {
+    setPeriod(view.period);
+    askQuestion(view.question);
+  };
   const memorySource = memoryFeed.data ? {
     source: 'Apollo memory revision database', status: 'available', lastSuccessfulAt: memoryFeed.refreshedAt,
     stale: memoryFeed.stale, data: { records: memoryFeed.data.memories || [], limitations: ['Only approved revisions are eligible for answers; changing sales facts remain in live reports.'] },
@@ -214,6 +255,9 @@ export default function ApolloBusinessPulse() {
     <p className="oa-note">Live activity refreshes once a minute; reports every five minutes while visible. Custom ranges: up to 366 days.</p>
     {summary.error && <p role="alert">{summary.error}</p>}
     {summary.stale && data && <p role="status">Report refresh failed. The previous result for this period is shown.</p>}
+    <nav className="oa-saved-views" aria-label="Saved Apollo views">
+      {SAVED_VIEWS.map(view => <button type="button" key={view.key} className={period === view.period ? 'is-selected' : ''} onClick={() => selectSavedView(view)}>{view.label}</button>)}
+    </nav>
     <section className="oa-today" aria-labelledby="apollo-today-title">
       <div className="oa-section-heading">
         <div><p className="oa-eyebrow">OPERATING NOW</p><h3 id="apollo-today-title">Today at a glance</h3></div>
@@ -235,6 +279,10 @@ export default function ApolloBusinessPulse() {
       </div>
       <p className="oa-note">Select a card to see the supporting report. Every total below retains its source, period and freshness.</p>
     </section>
+    <div className="oa-operating-grid">
+      <DataConfidence report={data} liveReport={live.data} />
+      <ActionQueue report={data} onAsk={askQuestion} />
+    </div>
     <section className="oa-panel" aria-labelledby="apollo-ask-title">
       <h3 id="apollo-ask-title">Ask Apollo</h3>
       <p className="oa-note">Answers use the owner-only reports shown below for the selected period. Questions are processed in this page and are not saved or sent to an AI provider.</p>
