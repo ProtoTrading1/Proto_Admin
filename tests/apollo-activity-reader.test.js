@@ -10,6 +10,7 @@ function database(tables = {}) {
     const q = { select() { return q; }, order() { return q; },
       gte(key, value) { filters.push((row) => row[key] >= value); return q; },
       lt(key, value) { filters.push((row) => row[key] < value); return q; },
+      eq(key, value) { filters.push((row) => row[key] === value); return q; },
       range(from, to) { return Promise.resolve({ data: (tables[table] || []).filter((row) => filters.every((f) => f(row))).slice(from, to + 1), error: null }); } };
     return q;
   } };
@@ -21,10 +22,12 @@ const active = (id, source, start, end, customer = 'customer') => ({ event_id: i
 describe('Apollo activity reporting reader', () => {
   it('reports a fully monitored historical window and unions cross-surface activity', async () => {
     const result = await readApolloActivity({ client: database({ apollo_collection_health: [completeHealth('main'), completeHealth('instore')],
-      apollo_activity_events: [active('a', 'main', 0, 60), active('b', 'instore', 30, 90)] }), window, checkedAt: at(180) });
+      apollo_activity_events: [active('a', 'main', 0, 60), active('b', 'instore', 30, 90),
+        { ...active('search', 'main', 10, 11), event_type: 'search_completed', payload: { original: 'beads', normalized: 'bead', results_count: 2 } }] }), window, checkedAt: at(180) });
     expect(result).toMatchObject({ status: 'available', complete: true, activeSeconds: 90, invalidHealthRows: 0, invalidEventRows: 0 });
     expect(result.sources.main).toMatchObject({ status: 'complete', verified: true, freshnessSeconds: 0 });
-    expect(result.customers).toEqual([expect.objectContaining({ customerId: 'customer', mainSeconds: 60, instoreSeconds: 60, activeSeconds: 90 })]);
+    expect(result).toMatchObject({ activeCustomers: 1, averageSecondsPerCustomer: 90 });
+    expect(result.eventsRead).toBe(2);
   });
 
   it('does not treat a missing health record or empty events as zero activity', async () => {
@@ -40,7 +43,7 @@ describe('Apollo activity reporting reader', () => {
       apollo_activity_events: [active('a', 'main', 20, 50)] }), window, checkedAt: at(180) });
     expect(result.complete).toBe(false);
     expect(result.sources.main).toMatchObject({ status: 'partial', verified: false, freshnessSeconds: 80, lastFailureAt: at(110) });
-    expect(result.activeSeconds).toBe(30);
+    expect(result.activeSeconds).toBe(null);
   });
 
   it('includes the one-minute left overlap and refuses malformed health/events', async () => {
@@ -49,7 +52,7 @@ describe('Apollo activity reporting reader', () => {
     expect(result.invalidHealthRows).toBe(1);
     expect(result.invalidEventRows).toBe(1);
     expect(result.complete).toBe(false);
-    expect(result.activeSeconds).toBe(30);
+    expect(result.activeSeconds).toBe(null);
   });
 
   it('has no client fallback and rejects invalid windows before database access', async () => {
@@ -57,3 +60,4 @@ describe('Apollo activity reporting reader', () => {
     await expect(readApolloActivity({ client: null, window, checkedAt: at(180) })).rejects.toThrow('client');
   });
 });
+
