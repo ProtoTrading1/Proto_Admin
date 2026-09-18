@@ -90,7 +90,7 @@ describe("InstoreProductsPanel", () => {
     );
   });
 
-  it("supports exact folder staging with a retained batch id", async () => {
+  it("requires filename review before staging an exact batch", async () => {
     const client = makeApi();
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -103,6 +103,12 @@ describe("InstoreProductsPanel", () => {
     await act(async () => {
       Object.defineProperty(input, "files", { value: [file] });
       input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(client.stage).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("SKU-1.jpg");
+    await act(async () => {
+      [...container.querySelectorAll("button")].find((button) => button.textContent === "Stage selected images").click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
     await vi.waitFor(() => expect(client.stage).toHaveBeenCalled());
     expect(client.stage.mock.calls[0][0]).toMatchObject({
@@ -130,6 +136,11 @@ describe("InstoreProductsPanel", () => {
       Object.defineProperty(input, "files", { value: [file] });
       input.dispatchEvent(new Event("change", { bubbles: true }));
       await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(client.stage).not.toHaveBeenCalled();
+    await act(async () => {
+      [...container.querySelectorAll("button")].find((button) => button.textContent === "Stage selected images").click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(container.textContent).toContain("Some staged files failed");
     expect(container.textContent).toContain("1 failed and can be retried");
@@ -275,3 +286,4 @@ describe("InstoreProductsPanel", () => {
     expect(container.textContent).toContain("Ordered on request");
   });
 });
+
