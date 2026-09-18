@@ -9,13 +9,18 @@ const PRODUCTION_HOSTS = new Set([
 const READ_ONLY_PREVIEW_POST_PATHS = new Set([
   '/api/product-loader-batch-lookup',
 ]);
+const TEST_WRITE_PATH = '/api/instore-admin';
+
+export function previewTestWritesEnabled(env = import.meta.env) {
+  return env?.VITE_INSTORE_ADMIN_TEST_WRITES === 'true';
+}
 
 export function isReadOnlyPreviewHost(hostname = '') {
   const host = String(hostname).trim().toLowerCase();
   return host.endsWith('.vercel.app') && !PRODUCTION_HOSTS.has(host);
 }
 
-export function shouldBlockPreviewRequest({ hostname = '', origin = '', url = '', method = 'GET' } = {}) {
+export function shouldBlockPreviewRequest({ hostname = '', origin = '', url = '', method = 'GET', allowInstoreTestWrites = false } = {}) {
   if (!isReadOnlyPreviewHost(hostname)) return false;
   if (['GET', 'HEAD', 'OPTIONS'].includes(String(method).toUpperCase())) return false;
 
@@ -23,6 +28,7 @@ export function shouldBlockPreviewRequest({ hostname = '', origin = '', url = ''
     const target = new URL(String(url), origin);
     if (target.origin !== origin || !target.pathname.startsWith('/api/')) return false;
     if (String(method).toUpperCase() === 'POST' && READ_ONLY_PREVIEW_POST_PATHS.has(target.pathname)) return false;
+    if (String(method).toUpperCase() === 'POST' && allowInstoreTestWrites && target.pathname === TEST_WRITE_PATH) return false;
     return true;
   } catch {
     return false;
@@ -45,6 +51,7 @@ export function installPreviewWriteGuard() {
       origin: window.location.origin,
       url,
       method,
+      allowInstoreTestWrites: previewTestWritesEnabled(),
     })) {
       return new Response(JSON.stringify({ error: 'This preview is read-only. Nothing was changed.' }), {
         status: 409,

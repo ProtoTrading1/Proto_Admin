@@ -88,6 +88,9 @@ export default async function handler(req, res) {
       return json(res, 200, { items: await Promise.all((data || []).map((row) => withSignedImage(sb, row))), total: count || 0, page, pageSize: PAGE_SIZE, publishEnabled: publishEnabled() });
     }
     if (req.method !== 'POST') return res.status(405).end();
+    if (!previewSafety.allowTestWrites) {
+      return json(res, 409, { error: 'This Preview review queue is read-only. Enable the isolated test-write switch to exercise lifecycle actions.' });
+    }
     const body = req.body || {};
     const action = String(body.action || '').toLowerCase();
     const sku = cleanSku(body.sku);

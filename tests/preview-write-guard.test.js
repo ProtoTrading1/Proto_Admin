@@ -43,6 +43,17 @@ describe('preview write guard', () => {
     })).toBe(true);
   });
 
+  it('permits only the Instore endpoint when the explicit disposable-test switch is on', () => {
+    const request = {
+      hostname: 'protoportal-admin-example-proto-team.vercel.app',
+      origin: 'https://protoportal-admin-example-proto-team.vercel.app',
+      method: 'POST',
+      allowInstoreTestWrites: true,
+    };
+    expect(shouldBlockPreviewRequest({ ...request, url: '/api/instore-admin' })).toBe(false);
+    expect(shouldBlockPreviewRequest({ ...request, url: '/api/product-loader-publish' })).toBe(true);
+  });
+
   it('does not interfere with authentication or other external services', () => {
     expect(shouldBlockPreviewRequest({
       hostname: 'protoportal-admin-example-proto-team.vercel.app',

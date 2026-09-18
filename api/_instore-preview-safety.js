@@ -31,6 +31,11 @@ export function getInstorePreviewSafety(env = process.env) {
   if (!String(env.STOCK_SUPABASE_KEY || '').trim()) {
     return { ok: false, error: 'Instore admin is disabled: a server-only test database key is required.' };
   }
-  return { ok: true, projectRef: ref };
+  return {
+    ok: true,
+    projectRef: ref,
+    // This is intentionally opt-in. A connected Preview remains read-only
+    // unless its exact branch is configured for disposable workflow testing.
+    allowTestWrites: env.INSTORE_ADMIN_TEST_WRITES === 'true',
+  };
 }
-

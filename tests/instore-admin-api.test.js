@@ -11,6 +11,7 @@ beforeEach(() => {
   requireOwner.mockResolvedValue(true);
   vi.stubEnv('INSTORE_ADMIN_PUBLISH_ENABLED', 'false');
   vi.stubEnv('INSTORE_ADMIN_PREVIEW_ONLY', 'true');
+  vi.stubEnv('INSTORE_ADMIN_TEST_WRITES', 'true');
   vi.stubEnv('INSTORE_ADMIN_TEST_PROJECT_REF', 'zbxvcdkcarrgtmdhwmdm');
   vi.stubEnv('STOCK_SUPABASE_URL', 'https://zbxvcdkcarrgtmdhwmdm.supabase.co');
   vi.stubEnv('STOCK_SUPABASE_KEY', 'test-only-server-key');

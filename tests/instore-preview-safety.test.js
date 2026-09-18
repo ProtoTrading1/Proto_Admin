@@ -15,6 +15,11 @@ describe('Instore connected-preview safety', () => {
     expect(getInstorePreviewSafety(safe)).toMatchObject({ ok: true, projectRef: testRef });
   });
 
+  it('keeps the connected Preview read-only until a separate test-write switch is enabled', () => {
+    expect(getInstorePreviewSafety(safe).allowTestWrites).toBe(false);
+    expect(getInstorePreviewSafety({ ...safe, INSTORE_ADMIN_TEST_WRITES: 'true' }).allowTestWrites).toBe(true);
+  });
+
   it('rejects production deployments and production-looking database URLs', () => {
     expect(getInstorePreviewSafety({ ...safe, VERCEL_ENV: 'production' }).ok).toBe(false);
     expect(getInstorePreviewSafety({ ...safe, STOCK_SUPABASE_URL: 'https://yiqsvwajozafvalwcero.supabase.co' }).ok).toBe(false);
@@ -27,4 +32,3 @@ describe('Instore connected-preview safety', () => {
     expect(getInstorePreviewSafety(env).ok).toBe(false);
   });
 });
-
