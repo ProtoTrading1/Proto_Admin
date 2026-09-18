@@ -113,10 +113,13 @@ export default function InstoreProductsPanel({ apiClient = api, onShowToast }) {
   const [rowState, setRowState] = useState({});
   const [loading, setLoading] = useState(false);
   const [staging, setStaging] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [stageProgress, setStageProgress] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const batchIdRef = useRef("");
   const folderRef = useRef(null);
+  const filesRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -254,13 +257,14 @@ export default function InstoreProductsPanel({ apiClient = api, onShowToast }) {
       setError("Choose a folder containing JPG, PNG, or WebP image files.");
       return;
     }
-    if (!batchIdRef.current) batchIdRef.current = batchUuid();
+    batchIdRef.current = batchUuid();
     setStaging(true);
     setError("");
     setNotice("");
     let ok = 0;
     let failed = 0;
     for (const file of images) {
+      setStageProgress(`Staging ${ok + failed + 1} of ${images.length}: ${file.name}`);
       const key = `file:${file.name}`;
       setRowState((current) => ({
         ...current,
@@ -287,6 +291,8 @@ export default function InstoreProductsPanel({ apiClient = api, onShowToast }) {
       }
     }
     setStaging(false);
+    setStageProgress("");
+    setPendingFiles([]);
     setNotice(
       `${ok} image${ok === 1 ? "" : "s"} staged${failed ? `; ${failed} failed and can be retried` : ""}.`,
     );
@@ -359,10 +365,24 @@ export default function InstoreProductsPanel({ apiClient = api, onShowToast }) {
           directory=""
           hidden
           onChange={(event) => {
-            void stageFolder(event.target.files);
+            setPendingFiles(Array.from(event.target.files || []));
             event.target.value = "";
           }}
         />
+        <input
+          ref={filesRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          hidden
+          onChange={(event) => {
+            setPendingFiles(Array.from(event.target.files || []));
+            event.target.value = "";
+          }}
+        />
+        <button type="button" className="adm-btn-secondary" disabled={staging} onClick={() => filesRef.current?.click()}>
+          Choose image files
+        </button>
         <button
           type="button"
           className="adm-btn-secondary"
@@ -391,6 +411,17 @@ export default function InstoreProductsPanel({ apiClient = api, onShowToast }) {
           </span>
         )}
       </div>
+      {pendingFiles.length > 0 && (
+        <div aria-label="Selected upload batch">
+          <p>{pendingFiles.length} files selected. Check these filenames before staging. Nothing is published.</p>
+          <details open><summary>Selected files</summary><ul>
+            {pendingFiles.map((file, index) => <li key={`${file.name}:${index}`}>{file.webkitRelativePath || file.name}</li>)}
+          </ul></details>
+          <button type="button" disabled={staging} onClick={() => void stageFolder(pendingFiles)}>Stage selected images</button>
+          <button type="button" disabled={staging} onClick={() => setPendingFiles([])}>Cancel selection</button>
+        </div>
+      )}
+      {stageProgress && <p role="status" aria-live="polite">{stageProgress}</p>}
       {error && (
         <div className="instore-error" role="alert">
           {error}
@@ -677,3 +708,4 @@ export default function InstoreProductsPanel({ apiClient = api, onShowToast }) {
     </section>
   );
 }
+
