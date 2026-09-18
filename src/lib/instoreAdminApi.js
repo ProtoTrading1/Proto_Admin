@@ -1,9 +1,25 @@
 import { readApiJson } from './apiError.js';
 const jsonHeaders = { 'Content-Type': 'application/json' };
+const REQUEST_TIMEOUT_MS = 45_000;
 
 async function request(url, options = {}, fallback = 'Instore request failed') {
-  const response = await fetch(url, { credentials: 'same-origin', ...options });
-  return readApiJson(response, { fallback });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      signal: controller.signal,
+    });
+    return readApiJson(response, { fallback });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`${fallback}: the request timed out. Please retry.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function fetchInstoreProducts({ status = 'live', q = '', page = 1, pageSize = 50 } = {}) {
