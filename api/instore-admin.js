@@ -6,6 +6,13 @@ import { createHash } from 'node:crypto';
 import { cleanSku, parseInstoreFilename, decodeImageBase64, availabilityFor, publicItem, INSTORE_STATES, INSTORE_MODES } from '../lib/instore-intake.mjs';
 import { getInstorePreviewSafety } from './_instore-preview-safety.js';
 
+// Images are limited to 2 MB after decoding. Base64 and JSON framing expand
+// that payload, so keep the request limit above the accepted binary maximum.
+export const config = {
+  api: { bodyParser: { sizeLimit: '3mb' } },
+  maxDuration: 30,
+};
+
 const TABLE = 'instore_admin_items';
 const IMAGE_TABLE = 'instore_admin_item_images';
 const PAGE_SIZE = 50;
