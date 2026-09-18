@@ -56,9 +56,17 @@ async function syncItem(sb, item) {
   // are its intended source; never reject them as "duplicates" or write back
   // to their catalogue records.
   const website = await optionalWebsiteSource(sb, sku);
-  const raw = await fetchStmastRow(sku).catch(() => null);
-  if (!raw || String(raw.CODE || raw.code || '').trim().toUpperCase() !== sku) {
-    return { review_error: 'positill_exact_lookup_unavailable', snapshot: { code: sku } };
+  let raw;
+  try {
+    raw = await fetchStmastRow(sku);
+  } catch (error) {
+    // Do not expose bridge URLs, credentials or arbitrary upstream messages.
+    const timeout = ['TimeoutError', 'AbortError'].includes(error?.name);
+    return { review_error: timeout ? 'positill_lookup_timed_out' : 'positill_connection_failed', snapshot: { code: sku, checked_at: new Date().toISOString() } };
+  }
+  if (!raw) return { review_error: 'positill_code_not_found', snapshot: { code: sku, checked_at: new Date().toISOString() } };
+  if (String(raw.CODE || raw.code || '').trim().toUpperCase() !== sku) {
+    return { review_error: 'positill_code_mismatch', snapshot: { code: sku } };
   }
   const numeric = ['PRICE_A', 'ONHAND', 'BOOKED'].every((key) => raw[key] != null && Number.isFinite(Number(raw[key])));
   if (!numeric) return { review_error: 'positill_numeric_fields_invalid', snapshot: { raw } };
@@ -203,3 +211,4 @@ export default async function handler(req, res) {
     return json(res, 400, { error: 'Unknown action' });
   } catch (error) { console.error('instore-admin:', error?.message || error); return json(res, /40001|stale_version|version/i.test(error?.code || error?.message || '') ? 409 : 500, { error: error?.message || 'Instore admin request failed' }); }
 }
+
