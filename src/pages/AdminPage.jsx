@@ -135,6 +135,7 @@ import { POSITILL_CUSTOMER_SALES_PERIOD } from '../lib/customerIq';
 // when the admin clicks a nav item.
 const AnalyticsHub = lazyRetry(() => import('../components/AnalyticsHub'));
 const ProductLoaderPanel = lazyRetry(() => import('../components/ProductLoaderPanel'));
+const InstoreProductsPanel = lazyRetry(() => import('../components/InstoreProductsPanel'));
 const BulkImageReplacePanel = lazyRetry(() => import('../components/BulkImageReplacePanel'));
 const BannerPanel = lazyRetry(() => import('../components/BannerPanel'));
 const FeaturedPanel = lazyRetry(() => import('../components/FeaturedPanel'));
@@ -2563,6 +2564,12 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                   <BackendHealthPanel />
                 </Suspense>
               </SectionErrorBoundary>
+            )}
+
+            {activeSection === 'instore-products' && (
+              <Suspense fallback={<div role="status">Loading Instore Products…</div>}>
+                <InstoreProductsPanel />
+              </Suspense>
             )}
 
             {activeSection === 'product-loader' && (
