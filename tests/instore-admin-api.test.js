@@ -74,7 +74,14 @@ describe('Instore admin API behavior', () => {
   it('keeps missing exact source data in review, not ready for approval', async () => {
     const { rpc } = stockMock(); fetchStmastRow.mockResolvedValue(null); const res = response();
     await handler(request(stageBody), res);
-    expect(rpc.mock.calls[0][1].p_patch.review_error).toBe('positill_exact_lookup_unavailable');
+    expect(rpc.mock.calls[0][1].p_patch.review_error).toBe('positill_code_not_found');
+  });
+  it.each([['TimeoutError', 'positill_lookup_timed_out'], ['Error', 'positill_connection_failed']])('distinguishes %s without leaking upstream messages', async (name, expected) => {
+    const { rpc } = stockMock();
+    fetchStmastRow.mockRejectedValue(Object.assign(new Error('private upstream detail'), { name }));
+    await handler(request(stageBody), response());
+    expect(rpc.mock.calls[0][1].p_patch.review_error).toBe(expected);
+    expect(JSON.stringify(rpc.mock.calls[0][1].p_patch)).not.toContain('private upstream detail');
   });
   it('sync preserves staff confirmed quantity while recorded stock stays zero', async () => {
     const { rpc } = stockMock({ sku: 'ABC123', version: 4, availability_mode: 'stock_available', confirmed_qty: 8 }); const res = response();
@@ -114,3 +121,4 @@ describe('Instore admin API behavior', () => {
   it('returns 400 for invalid image bytes', async () => { getStockClient.mockReturnValue({}); const res = response(); await handler(request({ action: 'stage', batchId: '123e4567-e89b-12d3-a456-426614174000', filename: 'ABC123.jpg', contentType: 'image/jpeg', imageBase64: Buffer.from('not-jpeg').toString('base64') }), res); expect(res.statusCode).toBe(400); expect(res.body.error).toMatch(/bytes|image/i); });
   it('keeps approval disabled by default without making a transition', async () => { const { rpc } = stockMock({ sku: 'ABC123', version: 1 }); const res = response(); await handler(request({ action: 'approve', sku: 'ABC123', version: 1 }), res); expect(res.statusCode).toBe(503); expect(rpc).not.toHaveBeenCalled(); });
 });
+
