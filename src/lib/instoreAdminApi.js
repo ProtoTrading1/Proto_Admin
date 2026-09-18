@@ -11,7 +11,7 @@ async function request(url, options = {}, fallback = 'Instore request failed') {
       ...options,
       signal: controller.signal,
     });
-    return readApiJson(response, { fallback });
+    return await readApiJson(response, { fallback });
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw new Error(`${fallback}: the request timed out. Please retry.`);
@@ -59,3 +59,4 @@ export const instoreAdminApi = {
 };
 
 export default instoreAdminApi;
+
