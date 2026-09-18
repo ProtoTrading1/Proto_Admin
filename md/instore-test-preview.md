@@ -1,5 +1,4 @@
 # Instore connected test preview
-
 This is a **test-branch-only** setup. It must never be placed on the production
 admin deployment and does not turn on customer discovery, basket, checkout or
 publication.
@@ -46,4 +45,3 @@ writing data.
 There is no production promotion path in this setup. A later storefront and
 checkout implementation needs its own preview, contract tests and explicit
 release approval.
-

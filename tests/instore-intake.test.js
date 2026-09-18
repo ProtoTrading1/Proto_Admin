@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { availabilityFor, cleanSku, parseInstoreFilename } from '../lib/instore-intake.mjs';
-
 describe('Instore intake contracts', () => {
   it('parses only strict image filenames and slots', () => {
     expect(parseInstoreFilename('ABC123.2.jpg')).toMatchObject({ sku: 'ABC123', imageSlot: 2, error: null });
@@ -18,4 +17,3 @@ describe('Instore intake contracts', () => {
   });
   it('normalizes SKU safely', () => expect(cleanSku(' ab-12 ')).toBe('AB-12'));
 });
-

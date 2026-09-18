@@ -7,6 +7,7 @@ import { cleanSku, parseInstoreFilename, decodeImageBase64, availabilityFor, pub
 import { getInstorePreviewSafety } from './_instore-preview-safety.js';
 
 const TABLE = 'instore_admin_items';
+const IMAGE_TABLE = 'instore_admin_item_images';
 const PAGE_SIZE = 50;
 const BUCKET = 'instore-intake';
 const publishEnabled = () => process.env.INSTORE_ADMIN_PUBLISH_ENABLED === 'true' && process.env.INSTORE_STOREFRONT_CONTRACT === 'v1';
@@ -15,9 +16,18 @@ function actor(req) { return verifyAdminUser(req).then((u) => u?.email || 'owner
 function uuid(value) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '')); }
 function json(res, status, body) { return res.status(status).json(body); }
 async function withSignedImage(sb, row) {
-  if (!row?.image_path) return publicItem(row);
-  const signed = await sb.storage.from(BUCKET).createSignedUrl(row.image_path, 300);
-  return publicItem({ ...row, image_url: signed.data?.signedUrl || null });
+  const { data: images, error } = await sb.from(IMAGE_TABLE)
+    .select('image_slot, image_path')
+    .eq('sku', row.sku)
+    .order('image_slot', { ascending: true });
+  if (error) throw error;
+  // Rows staged before slots were introduced still retain their primary image.
+  const paths = images?.length ? images : (row?.image_path ? [{ image_slot: 1, image_path: row.image_path }] : []);
+  const signedImages = await Promise.all(paths.map(async (image) => {
+    const signed = await sb.storage.from(BUCKET).createSignedUrl(image.image_path, 300);
+    return { image_slot: image.image_slot, image_url: signed.data?.signedUrl || null };
+  }));
+  return publicItem({ ...row, image_url: signedImages[0]?.image_url || null, image_urls: signedImages });
 }
 
 async function optionalWebsiteSource(sb, sku) {
@@ -101,21 +111,43 @@ export default async function handler(req, res) {
       if (!parsed.sku) return json(res, 400, { error: parsed.error });
       let bytes;
       try { bytes = decodeImageBase64(body.imageBase64, body.contentType); } catch (error) { return json(res, 400, { error: error.message }); }
+      const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 20);
+      const suffix = String(body.contentType).split('/')[1].toLowerCase().replace('jpeg', 'jpg');
+      const path = `${body.batchId}/${parsed.sku}/s${parsed.imageSlot}-${digest}.${suffix}`;
       const { data: existingInstore, error: existingError } = await sb.from(TABLE).select('sku, version').eq('sku', parsed.sku).maybeSingle();
       if (existingError) throw existingError;
-      if (existingInstore) {
-        const existing = await sb.from(TABLE).select('*').eq('sku', parsed.sku).maybeSingle();
-        return json(res, 200, { item: publicItem(existing.data), idempotent: true });
+      if (!existingInstore && parsed.imageSlot !== 1) {
+        return json(res, 400, { error: 'Stage the primary image (SKU.jpg or SKU.1.jpg) before additional image slots.' });
       }
-      const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 20);
-      const path = `${body.batchId}/${parsed.sku}/s${parsed.imageSlot}-${digest}.${String(body.contentType).split('/')[1].replace('jpeg', 'jpg')}`;
+      const { data: existingSlot, error: slotError } = await sb.from(IMAGE_TABLE)
+        .select('image_path, content_digest').eq('sku', parsed.sku).eq('image_slot', parsed.imageSlot).maybeSingle();
+      if (slotError) throw slotError;
+      if (existingSlot) {
+        // A retry may arrive with a fresh UI batch id, hence a different
+        // destination path. The bytes are the idempotency key; retain the
+        // first reviewed path rather than creating a second copy.
+        if (existingSlot.content_digest === digest) {
+          const existing = await sb.from(TABLE).select('*').eq('sku', parsed.sku).maybeSingle();
+          return json(res, 200, { item: publicItem(existing.data), idempotent: true });
+        }
+        return json(res, 409, { error: `Image slot ${parsed.imageSlot} for ${parsed.sku} already has different content. Recycle or replace it explicitly; staging never overwrites a reviewed image.` });
+      }
       const upload = await sb.storage.from(BUCKET).upload(path, bytes, { contentType: body.contentType, upsert: false });
       if (upload.error && !/already exists|duplicate/i.test(upload.error.message || '')) throw upload.error;
-      const sourcePatch = await syncItem(sb, { sku: parsed.sku, availability_mode: 'positill' });
-      const patch = { filename: String(body.filename), batch_id: body.batchId, image_path: path, status: 'archived', ...sourcePatch };
-      const inserted = await sb.rpc('instore_admin_transition', { p_sku: parsed.sku, p_expected_version: null, p_action: 'stage', p_actor: by, p_patch: patch });
-      if (inserted.error) throw inserted.error;
-      return json(res, 201, { item: publicItem(inserted.data) });
+      let item = existingInstore;
+      if (!item) {
+        const sourcePatch = await syncItem(sb, { sku: parsed.sku, availability_mode: 'positill' });
+        const patch = { filename: String(body.filename), batch_id: body.batchId, image_path: path, status: 'archived', ...sourcePatch };
+        const inserted = await sb.rpc('instore_admin_transition', { p_sku: parsed.sku, p_expected_version: null, p_action: 'stage', p_actor: by, p_patch: patch });
+        if (inserted.error) throw inserted.error;
+        item = inserted.data;
+      }
+      const { error: imageError } = await sb.from(IMAGE_TABLE).insert({
+        sku: parsed.sku, image_slot: parsed.imageSlot, image_path: path,
+        content_digest: digest, content_type: body.contentType, filename: String(body.filename), batch_id: body.batchId,
+      });
+      if (imageError) throw imageError;
+      return json(res, existingInstore ? 200 : 201, { item: publicItem(item), imageSlot: parsed.imageSlot });
     }
     if (!sku) return json(res, 400, { error: 'sku is required' });
     const current = await sb.from(TABLE).select('*').eq('sku', sku).maybeSingle();

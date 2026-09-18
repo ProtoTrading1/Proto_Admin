@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import api from "../lib/instoreAdminApi.js";
 import "./InstoreProductsPanel.css";
-
 const TABS = ["live", "archived", "recycle"];
 const PAGE_SIZE = 50;
 
@@ -678,4 +677,3 @@ export default function InstoreProductsPanel({ apiClient = api, onShowToast }) {
     </section>
   );
 }
-

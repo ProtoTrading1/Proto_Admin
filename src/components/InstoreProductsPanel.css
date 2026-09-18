@@ -26,7 +26,6 @@
 .instore-status--error { color: #b91c1c; }
 .instore-status--pending { color: #92400e; }
 .instore-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
 /* The admin shell has a persistent navigation rail.  At common laptop widths
    there is not enough room for six useful table columns, so each record becomes
    a compact card instead of forcing an awkward side-scroll. */
@@ -58,4 +57,3 @@
   .instore-product-editor { grid-template-columns: 48px minmax(0, 1fr); }
   .instore-thumb { width: 48px; height: 48px; }
 }
-

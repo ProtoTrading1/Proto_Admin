@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 const { requireOwner, verifyAdminUser, getStockClient, fetchStmastRow } = vi.hoisted(() => ({ requireOwner: vi.fn(), verifyAdminUser: vi.fn(async () => ({ email: 'owner@example.test' })), getStockClient: vi.fn(), fetchStmastRow: vi.fn() }));
 vi.mock('../api/_admin-auth.js', () => ({ requireOwner, verifyAdminUser }));
 vi.mock('../api/_stock-client.js', () => ({ getStockClient }));
@@ -18,18 +19,24 @@ beforeEach(() => {
   vi.stubEnv('VERCEL_ENV', 'preview');
 });
 
-function stockMock(item = null, duplicate = null) {
+function stockMock(item = null, duplicate = null, slot = null) {
   const upload = vi.fn(async () => ({ error: null }));
+  const imageInsert = vi.fn(async () => ({ error: null }));
   const rpc = vi.fn(async (_name, args) => ({ data: { sku: args.p_sku, version: 1, ...args.p_patch }, error: null }));
   const client = { rpc, storage: { from: () => ({ upload }) }, from: vi.fn((table) => {
-    const chain = { select: () => chain, eq: () => chain, or: () => chain, maybeSingle: async () => ({ data: table === 'instore_admin_items' ? item : table === 'products' ? { units_of_issue: 'PACK 5' } : duplicate, error: null }) };
+    const chain = {
+      select: () => chain, eq: () => chain, or: () => chain,
+      insert: imageInsert,
+      maybeSingle: async () => ({ data: table === 'instore_admin_items' ? item : table === 'instore_admin_item_images' ? slot : table === 'products' ? { units_of_issue: 'PACK 5' } : duplicate, error: null }),
+    };
     return chain;
   }) };
   getStockClient.mockReturnValue(client);
   fetchStmastRow.mockResolvedValue({ CODE: 'ABC123', DESCR: 'METAL CHARMS', PRICE_A: 25.65, ONHAND: 0, BOOKED: 0 });
-  return { client, upload, rpc };
+  return { client, upload, rpc, imageInsert };
 }
 const stageBody = { action: 'stage', batchId: '123e4567-e89b-12d3-a456-426614174000', filename: 'ABC123.jpg', contentType: 'image/jpeg', imageBase64: Buffer.from([255,216,255,217]).toString('base64') };
+const stageDigest = createHash('sha256').update(Buffer.from([255,216,255,217])).digest('hex').slice(0, 20);
 describe('Instore admin API behavior', () => {
   it('stages an exact code privately with real zero stock and inclusive price', async () => {
     const { rpc, upload } = stockMock(); const res = response();
@@ -37,11 +44,28 @@ describe('Instore admin API behavior', () => {
     expect(res.statusCode).toBe(201); expect(upload).toHaveBeenCalledOnce();
     expect(rpc).toHaveBeenCalledWith('instore_admin_transition', expect.objectContaining({ p_sku: 'ABC123', p_action: 'stage', p_patch: expect.objectContaining({ status: 'archived', recorded_stock: 0, confirmed_qty: null, price_incl_vat: 29.5, units_of_issue: 'PACK 5' }) }));
   });
-  it('does not upload or overwrite an existing exact SKU on retry', async () => {
-    const { rpc, upload } = stockMock({ sku: 'ABC123', version: 3 }); const res = response();
+  it('does not upload or overwrite an existing SKU slot on an exact retry', async () => {
+    const path = `${stageBody.batchId}/ABC123/s1-${stageDigest}.jpg`;
+    const { rpc, upload, imageInsert } = stockMock({ sku: 'ABC123', version: 3 }, null, { image_path: path, content_digest: stageDigest }); const res = response();
     await handler(request(stageBody), res);
     expect(res.statusCode).toBe(200); expect(res.body.idempotent).toBe(true);
-    expect(rpc).not.toHaveBeenCalled(); expect(upload).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled(); expect(upload).not.toHaveBeenCalled(); expect(imageInsert).not.toHaveBeenCalled();
+  });
+  it('stores a numbered image as an additional slot without replacing the primary item image', async () => {
+    const { rpc, imageInsert } = stockMock({ sku: 'ABC123', version: 3 }); const res = response();
+    await handler(request({ ...stageBody, filename: 'ABC123.2.jpg' }), res);
+    expect(res.statusCode).toBe(200); expect(rpc).not.toHaveBeenCalled();
+    expect(imageInsert).toHaveBeenCalledWith(expect.objectContaining({ sku: 'ABC123', image_slot: 2 }));
+  });
+  it('rejects an additional image before a primary item exists', async () => {
+    const { upload, rpc } = stockMock(); const res = response();
+    await handler(request({ ...stageBody, filename: 'ABC123.2.jpg' }), res);
+    expect(res.statusCode).toBe(400); expect(upload).not.toHaveBeenCalled(); expect(rpc).not.toHaveBeenCalled();
+  });
+  it('rejects a different retry for an occupied image slot without overwriting it', async () => {
+    const { upload, imageInsert } = stockMock({ sku: 'ABC123', version: 3 }, null, { image_path: 'old/path.jpg', content_digest: '00000000000000000000' }); const res = response();
+    await handler(request(stageBody), res);
+    expect(res.statusCode).toBe(409); expect(upload).not.toHaveBeenCalled(); expect(imageInsert).not.toHaveBeenCalled();
   });
   it('stages an existing source SKU as a private Instore review item', async () => {
     const { upload } = stockMock(null, { sku: 'ABC123' }); const res = response();

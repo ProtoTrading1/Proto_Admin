@@ -1,5 +1,4 @@
 import { readApiJson } from './apiError.js';
-
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
 async function request(url, options = {}, fallback = 'Instore request failed') {
@@ -44,4 +43,3 @@ export const instoreAdminApi = {
 };
 
 export default instoreAdminApi;
-
