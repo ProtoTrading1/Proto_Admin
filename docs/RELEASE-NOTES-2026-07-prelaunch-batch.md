@@ -93,7 +93,15 @@ After each merge: `npm run build`, `node scripts/qa-smoke-check.mjs`, redeploy, 
 
 ## Manual step: Portal PR push
 
-The cloud agent cannot push to `Proto-Website-` (403). From your machine:
+The cloud agent cannot push to `Proto-Website-` (403) until the Cursor GitHub App is granted access to that repo. See **`docs/portal-cloud-agent-deployment.md`** for the full fix (GitHub app + optional `GH_TOKEN`).
+
+Verify after fixing:
+
+```bash
+node scripts/verify-portal-github-access.mjs
+```
+
+Until then, from your machine:
 
 ```bash
 cd Proto-Website-
