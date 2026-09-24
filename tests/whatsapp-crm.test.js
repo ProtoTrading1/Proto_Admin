@@ -299,12 +299,31 @@ describe('WhatsApp CRM boundaries', () => {
   it('requires an admin session on every WhatsApp admin route', () => {
     for (const file of [
       'whatsapp-contacts.js', 'whatsapp-templates.js', 'whatsapp-opt-outs.js',
-      'whatsapp-broadcast.js', 'whatsapp-dashboard.js',
+      'whatsapp-broadcast.js', 'whatsapp-dashboard.js', 'whatsapp-status.js',
     ]) {
       expect(api(file), `${file} guards with requireAdminKey`).toMatch(/requireAdminKey\(req, res\)/);
     }
     // The cron sync accepts the cron secret as well as an admin session.
     expect(api('whatsapp-sync.js')).toMatch(/requireCronOrAdminKey\(req, res\)/);
+  });
+
+  it('proves the connection by calling WATI, not by reading an env var', () => {
+    // An expired token still satisfies `process.env.WATI_API_TOKEN`. If the
+    // green dot were driven by that alone it would stay green right up until a
+    // broadcast failed, which is the worst moment to learn the token died.
+    const status = api('whatsapp-status.js');
+    expect(status).toMatch(/watiListTemplates/);
+    expect(status).toMatch(/connected = true/);
+    // The token itself must never travel to the browser in the status payload.
+    expect(status).not.toMatch(/token:\s*token|WATI_API_TOKEN\s*[,}]/);
+  });
+
+  it('separates "WATI reachable" from "webhook delivering"', () => {
+    // The two halves fail independently: sends can work perfectly while a
+    // mistyped X-Webhook-Secret means every broadcast reports 0 delivered.
+    const status = api('whatsapp-status.js');
+    expect(status).toMatch(/WHATSAPP_WEBHOOK_SECRET/);
+    expect(status).toMatch(/lastEventAt/);
   });
 
   it('keeps the migration file in the repo so the schema is reviewable', () => {

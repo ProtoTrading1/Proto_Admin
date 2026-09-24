@@ -1,6 +1,7 @@
 import { Suspense, useState } from 'react';
 import { BarChart2, LayoutDashboard, Loader2, Send, UserX, Users } from 'lucide-react';
 import { lazyRetry } from '../lib/lazyRetry';
+import WhatsappConnectionStatus from './whatsapp/WhatsappConnectionStatus';
 
 const WhatsappDashboard = lazyRetry(() => import('./whatsapp/WhatsappDashboard'));
 const WhatsappContacts = lazyRetry(() => import('./whatsapp/WhatsappContacts'));
@@ -61,10 +62,13 @@ export default function WhatsappPanel({ onShowToast, isOwner = true }) {
             broadcast automatically.
           </p>
         </div>
-        <button type="button" className="adm-btn-red" onClick={() => openBroadcast([])}>
-          <Send size={15} style={{ marginRight: 6, verticalAlign: -2 }} />
-          New broadcast
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <WhatsappConnectionStatus />
+          <button type="button" className="adm-btn-red" onClick={() => openBroadcast([])}>
+            <Send size={15} style={{ marginRight: 6, verticalAlign: -2 }} />
+            New broadcast
+          </button>
+        </div>
       </div>
 
       <div className="adm-customer-tabs" style={{ marginBottom: 14 }}>
