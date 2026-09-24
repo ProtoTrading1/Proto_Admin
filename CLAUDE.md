@@ -29,21 +29,27 @@ npm run build
 `image-replace` · `catalogue` (Product Manager, live only) · `archive`
 (archived products, no category sidebar) · `reorder` (Reorder Grid) ·
 `customers` · `comms` (Email CRM: Brevo-synced contacts + broadcast composer +
-Email Analytics) · `site-content` (Featured + Specials + Banner Editor) ·
+Email Analytics) · `whatsapp` (WhatsApp CRM: WATI broadcasts, delivery/click
+analytics, opt-outs) · `site-content` (Featured + Specials + Banner Editor) ·
 `analytics` · `pricing` · `team` (opens fulfillment team modal).
 
 Removed features — do NOT reintroduce: **Apollo (the entire tab, engine and
-docs)**, **WhatsApp/WATI outgoing messaging TO CUSTOMERS** (order alerts,
-broadcasts, welcome messages, Intercom relay — the customer's
-`accept_whatsapp` opt-in DATA stays), Cost Tracking, product approval tab,
-reorder mode inside Product Manager, product-type dropdown in the edit modal,
-scheduled send for email broadcasts (immediate-send only).
+docs)**, **WhatsApp order alerts to customers**, **WhatsApp welcome messages**,
+**the WhatsApp Intercom relay** (inbox / two-way chat), Cost Tracking, product
+approval tab, reorder mode inside Product Manager, product-type dropdown in the
+edit modal, scheduled send for email broadcasts (immediate-send only).
 
 **Exception — internal team WhatsApp.** Outgoing WhatsApp to the *fulfilment
 team* is deliberate and supported: `api/order-team-whatsapp.js` broadcasts a
 new order to the numbers in `fulfillment/users.json` via WATI. It is
 internal-only and can never reach a customer number. Do not delete it as
 "WATI leftovers".
+
+**Reinstated 2026-09-24 — consented WhatsApp marketing.** The `whatsapp` tab
+sends WATI template broadcasts to customers, which the old blanket ban
+disallowed. It is scoped, not a return of the removed feature: opt-in only,
+approved templates only, opt-outs enforced server-side. See "WhatsApp CRM"
+below. Order alerts, welcome messages and the Intercom relay stay removed.
 
 ## Customers & email
 - **Customer codes are NEVER auto-generated** — always null or an admin-typed
@@ -64,6 +70,57 @@ internal-only and can never reach a customer number. Do not delete it as
   `WEBHOOK_SECRET` in Vercel and configure Brevo to send the same value as the
   `X-Webhook-Secret` header (or Bearer token). The endpoint fails closed when
   the secret is absent or incorrect.
+
+## WhatsApp CRM (`whatsapp` tab)
+
+Consented WhatsApp marketing through WATI. Migration `070_whatsapp_crm.sql`
+extends the `whatsapp_*` tables that survived migration 055 and adds
+`whatsapp_opt_outs`.
+
+**The consent rule — three conditions, all required, re-checked server-side on
+every send including "selected contacts":**
+
+1. `customers.accept_whatsapp = true`
+2. the number normalizes to a valid one (`api/_whatsapp-phone.js`)
+3. no row in `whatsapp_opt_outs`
+
+`api/_whatsapp-audience.js` is the only place that answers "may we message this
+person?". A phone list from the browser is a **filter over** the eligible set,
+never the set itself — a stale tab cannot reach someone who opted out. The
+resolver also backs the Contacts list and the dashboard, so the audience count
+on screen is the count that gets messaged.
+
+**Broadcasts are always approved WATI templates.** Outside a 24-hour
+customer-initiated window WhatsApp silently drops non-template messages, so a
+free-text composer would report 1 500 successful sends that nobody received.
+`api/whatsapp-templates.js` only offers templates WATI reports as `APPROVED`.
+
+**Click analytics are ours, not WhatsApp's.** WhatsApp reports delivered and
+read; it has no click webhook. A broadcast whose parameter contains `{{link}}`
+gets a per-recipient tracked link (`api/wa-click.js` → 302), so Analytics can
+name who clicked. The redirect is public by design (the clicker has no admin
+session) and is not an open redirect — the destination comes from the broadcast
+row.
+
+**Opt-outs arrive three ways** and all land in `whatsapp_opt_outs`:
+a customer replying STOP/unsubscribe (`api/wati-webhook.js`), a customer
+switching broadcasts off inside WhatsApp (read back by `api/whatsapp-sync.js`,
+which is why the pull half of the sync is not optional), and an admin adding one.
+Lifting an opt-out is **owner-only**.
+
+Files: `api/_wati-client.js` (WATI HTTP — deliberately separate from
+`_wati-notify.js`, the team alert), `api/_whatsapp-audience.js` (consent gate),
+`api/_whatsapp-broadcast.js` (send runner), `api/_whatsapp-phone.js`
+(normalization), routes `whatsapp-{dashboard,contacts,templates,broadcast,sync,opt-outs}.js`,
+`wati-webhook.js`, `wa-click.js`; UI `src/components/WhatsappPanel.jsx` +
+`src/components/whatsapp/`.
+
+**Env vars (Vercel):** `WATI_API_TOKEN` (bearer JWT — expires, rotate it),
+`WATI_API_URL` (defaults to the tenant URL), `WHATSAPP_WEBHOOK_SECRET` (send it
+from WATI as `X-Webhook-Secret`; the webhook fails closed without it),
+`WHATSAPP_CLICK_BASE_URL` (optional, defaults to `ADMIN_PUBLIC_URL`),
+`WHATSAPP_CLICK_FALLBACK_URL` (optional, defaults to `https://proto.co.za`).
+Cron: `/api/whatsapp-sync` every 3 hours, pushing up to 250 contacts per run.
 
 ## Auth
 
