@@ -124,6 +124,18 @@
     },
     "api/order-notification.js": {
       "maxDuration": 60
+    },
+    "api/whatsapp-broadcast.js": {
+      "maxDuration": 300
+    },
+    "api/whatsapp-sync.js": {
+      "maxDuration": 300
+    },
+    "api/whatsapp-contacts.js": {
+      "maxDuration": 60
+    },
+    "api/whatsapp-dashboard.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
@@ -134,6 +146,10 @@
     {
       "path": "/api/brevo-sync",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/whatsapp-sync",
+      "schedule": "17 */3 * * *"
     },
     {
       "path": "/api/purge-expired-staging",

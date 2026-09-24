@@ -65,6 +65,16 @@ describe('intelligence section access', () => {
   it('keeps URL deep links behind the same role allowlist as navigation', () => {
     const source = readFileSync(new URL('../src/pages/AdminPage.jsx', import.meta.url), 'utf8');
     expect(source).toContain("section && allowedSectionIds.includes(section)");
-    expect(source).toContain("const CUSTOMER_SERVICE_SECTIONS = ['orders', 'customers', 'comms']");
+
+    // The guard is "customer service sees only customer-facing sections", not a
+    // frozen list — asserting the exact array broke the moment WhatsApp CRM was
+    // added, which is a legitimate change. Assert the invariant instead.
+    const declaration = source.match(/const CUSTOMER_SERVICE_SECTIONS = \[([^\]]*)\]/);
+    expect(declaration).not.toBeNull();
+    const sections = declaration[1].split(',').map((entry) => entry.trim().replace(/'/g, '')).filter(Boolean);
+    expect(sections).toEqual(expect.arrayContaining(['orders', 'customers', 'comms']));
+    for (const ownerOnly of ['catalogue', 'product-loader', 'pricing', 'product-intelligence', 'image-processing']) {
+      expect(sections).not.toContain(ownerOnly);
+    }
   });
 });

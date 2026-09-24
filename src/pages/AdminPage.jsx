@@ -163,6 +163,7 @@ function SectionSuspenseFallback({ label = 'Loading…' }) {
 // Modal-only — chunk downloads the first time the admin opens the dialog.
 const CustomerEmailModal = lazyRetry(() => import('../components/CustomerEmailModal'));
 const CommsPanel = lazyRetry(() => import('../components/CommsPanel'));
+const WhatsappPanel = lazyRetry(() => import('../components/WhatsappPanel'));
 // AddCustomerModal is tiny and eager (not lazy) so opening it can never hit a
 // stale-chunk load failure — which the recovery would resolve by reloading the
 // whole page (reads as "the button just refreshes").
@@ -204,7 +205,7 @@ const ADMIN_PAGE_SIZE = 50;
 /** Order Requests pages small by default — the tabs are a working queue, not an archive. */
 const ORDER_PAGE_SIZES = [10, 25, 50, 100];
 const ORDER_PAGE_SIZE_DEFAULT = 10;
-const CUSTOMER_SERVICE_SECTIONS = ['orders', 'customers', 'comms'];
+const CUSTOMER_SERVICE_SECTIONS = ['orders', 'customers', 'comms', 'whatsapp'];
 const OWNER_ONLY_SECTIONS = new Set(['image-processing', 'title-replace']);
 
 function replaceAdminSectionUrl(section) {
@@ -3259,6 +3260,18 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                   <CommsPanel
                     onCompose={(target) => { setComposeTarget(target || null); setCustomerEmailOpen(true); }}
                     onShowToast={showToast}
+                  />
+                </Suspense>
+              </SectionErrorBoundary>
+            )}
+
+            {/* WHATSAPP CRM — WATI broadcasts, delivery/click analytics, opt-outs */}
+            {activeSection === 'whatsapp' && (
+              <SectionErrorBoundary name="whatsapp" title="WhatsApp CRM crashed" resetKey={activeSection}>
+                <Suspense fallback={<LazySectionFallback label="Loading WhatsApp CRM…" />}>
+                  <WhatsappPanel
+                    onShowToast={showToast}
+                    isOwner={customer?.role === 'owner'}
                   />
                 </Suspense>
               </SectionErrorBoundary>

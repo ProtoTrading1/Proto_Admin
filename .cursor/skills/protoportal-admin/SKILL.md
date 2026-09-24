@@ -54,14 +54,22 @@ npm run build
 | `archive` | Archive (archived products, no category sidebar) |
 | `reorder` | Reorder Grid (`ReorderPanel.jsx` + `ReorderGrid.jsx`) |
 | `customers` | Customer Management (requests / pre-registration / approved / email analytics) |
+| `whatsapp` | WhatsApp CRM — WATI broadcasts, delivery/click analytics, opt-outs (`WhatsappPanel.jsx`) |
 | `site-content` | Site Content — Featured + Specials + Banner Editor sub-tabs |
 | `analytics` | Analytics |
 | `pricing` | Pricing |
 | `team` | Team (opens fulfillment team modal, no section) |
 
-Removed (never reintroduce): Apollo (entire tab + engine), WhatsApp/WATI outgoing messaging (opt-in data stays), Cost Tracking,
-product approval tab, reorder mode inside Product Manager, recycle-bin
-buttons, product-type dropdown.
+Removed (never reintroduce): Apollo (entire tab + engine), WhatsApp order alerts
+and welcome messages to customers, the WhatsApp Intercom relay / two-way inbox,
+Cost Tracking, product approval tab, reorder mode inside Product Manager,
+recycle-bin buttons, product-type dropdown.
+
+Reinstated 2026-09-24, scoped: consented WhatsApp *marketing* via the `whatsapp`
+tab — opt-in only, approved WATI templates only, opt-outs enforced server-side in
+`api/_whatsapp-audience.js`. The internal fulfilment-team alert
+(`api/order-team-whatsapp.js` + `_wati-notify.js`) remains a separate path and
+must not be merged with the CRM's `_wati-client.js`.
 
 ## Data layer
 
