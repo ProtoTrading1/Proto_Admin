@@ -136,6 +136,9 @@
     },
     "api/whatsapp-dashboard.js": {
       "maxDuration": 60
+    },
+    "api/whatsapp-status.js": {
+      "maxDuration": 30
     }
   },
   "crons": [
