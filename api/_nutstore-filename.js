@@ -1,4 +1,5 @@
 import { codeLookupCandidates, firstCodeToken } from '../lib/code-normalize.mjs';
+import { parseColourVariantFilename } from '../lib/product-colour-variants.mjs';
 
 const IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
 const SLOT_SUFFIX = /^(?<sku>.+)\.(?<slot>[2-4])$/i;
@@ -45,7 +46,8 @@ export function parseNutstoreFilename(filename) {
   for (const pattern of NOISE_PATTERNS) working = working.replace(pattern, '').trim();
 
   const displayCode = working;
-  const code = firstCodeToken(working);
+  const colourVariant = parseColourVariantFilename(name);
+  const code = colourVariant?.variantSku || firstCodeToken(working);
 
   if (code.length < 2) {
     return { code: '', displayCode: '', imageSlot: 1, parseError: 'sku_too_short' };
@@ -53,9 +55,10 @@ export function parseNutstoreFilename(filename) {
 
   return {
     code,
-    fullCode,
-    displayCode,
-    imageSlot,
+    fullCode: colourVariant?.variantSku || fullCode,
+    displayCode: colourVariant?.variantSku || displayCode,
+    imageSlot: colourVariant?.preferredSlot || imageSlot,
+    colourVariant: colourVariant || null,
     parseError: null,
     codeCandidates: codeLookupCandidates(working),
   };

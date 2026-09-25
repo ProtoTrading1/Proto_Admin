@@ -24,6 +24,14 @@ function resolveArchiveCategories(item) {
   return { category, subcategoryOne };
 }
 
+function slotNumber(value) {
+  return Math.min(4, Math.max(1, Number(value) || 1));
+}
+
+function slotField(slot) {
+  return SLOT_FIELDS[slotNumber(slot) - 1];
+}
+
 function getStockClient() {
   return createClient(
     process.env.VITE_STOCK_SUPABASE_URL,
@@ -49,16 +57,13 @@ async function publishOne(sb, item, { overwriteImage }) {
   const sku = String(item.code || '').trim().toUpperCase();
   const path = String(item.path || '').trim();
   if (!sku || !path) throw new Error('code and path required');
+  const slot = slotNumber(item.imageSlot);
+  const imageField = slotField(slot);
 
   const category = String(item.category || '').trim();
   const subcategoryOne = String(item.subcategoryOne || item.subcategory_one || category).trim();
   if (!category || !subcategoryOne) throw new Error('category and subcategoryOne required');
 
-  const { buffer, contentType, filename } = await downloadNutstoreFile(path);
-  const imageUrl = await uploadImageBuffer(sb, { sku, slot: 1, filename, buffer, contentType });
-
-  const slot = 1;
-  const imageField = SLOT_FIELDS[slot - 1];
   const { data: existing, error: lookupErr } = await sb
     .from('website_stock')
     .select('*')
@@ -68,10 +73,13 @@ async function publishOne(sb, item, { overwriteImage }) {
 
   const shouldOverwrite = overwriteImage || item.overwriteImage || item.warnings?.includes('image_exists');
   if (existing?.[imageField] && !shouldOverwrite) {
-    const err = new Error(`Image slot 1 already has an image for ${sku}`);
+    const err = new Error(`Image slot ${slot} already has an image for ${sku}`);
     err.code = 'image_exists';
     throw err;
   }
+
+  const { buffer, contentType, filename } = await downloadNutstoreFile(path);
+  const imageUrl = await uploadImageBuffer(sb, { sku, slot, filename, buffer, contentType });
 
   const now = new Date().toISOString();
   const { title, description } = resolveCatalogTextFields(item);
@@ -120,7 +128,7 @@ async function publishOne(sb, item, { overwriteImage }) {
     action,
     source: 'nutstore_product_loader',
     publishMode: 'direct',
-    imageSlot: 1,
+    imageSlot: slot,
     imageSource: 'nutstore',
     oldValues: existing ? { title: existing.title, price: existing.price, [imageField]: existing[imageField] } : null,
     newValues: {
@@ -149,7 +157,7 @@ function resolveCatalogTextFields(item) {
   };
 }
 
-function buildArchivePayload(item, { sku, imageUrl, filename, now }) {
+function buildArchivePayload(item, { sku, slot = 1, imageUrl, filename, now }) {
   const { category, subcategoryOne } = resolveArchiveCategories(item);
   const resolved = resolveCatalogTextFields(item);
   // Unmatched codes still archive — placeholder text until a code fix
@@ -169,7 +177,7 @@ function buildArchivePayload(item, { sku, imageUrl, filename, now }) {
     subcategory_two: item.subcategoryTwo || item.subcategory_two || null,
     subcategory_three: item.subcategoryThree || item.subcategory_three || null,
     subcategory_four: item.subcategoryFour || item.subcategory_four || null,
-    image_url_one: imageUrl,
+    [slotField(slot)]: imageUrl,
     archived_by: NUTSTORE_ARCHIVED_BY,
     archived_at: now,
     updated_at: now,
@@ -180,26 +188,34 @@ async function archiveOne(sb, item) {
   const sku = String(item.code || '').trim().toUpperCase();
   const path = String(item.path || '').trim();
   if (!sku || !path) throw new Error('code and path required');
+  const slot = slotNumber(item.imageSlot);
+  const imageField = slotField(slot);
 
   const [{ data: liveRow }, { data: archivedRow }] = await Promise.all([
     sb.from('website_stock').select('*').eq('sku', sku).maybeSingle(),
-    sb.from('archived_products').select('sku, archived_by').eq('sku', sku).maybeSingle(),
+    sb.from('archived_products').select(`sku, archived_by, ${imageField}`).eq('sku', sku).maybeSingle(),
   ]);
 
   if (archivedRow && archivedRow.archived_by !== NUTSTORE_ARCHIVED_BY) {
     throw new Error(`SKU "${sku}" is archived as "${archivedRow.archived_by}"`);
   }
 
-  const { buffer, contentType, filename } = await downloadNutstoreFile(path);
-  const imageUrl = await uploadImageBuffer(sb, { sku, slot: 1, filename, buffer, contentType });
+  const shouldOverwrite = item.overwriteImage || item.warnings?.includes('image_exists');
+  let imageUrl = liveRow?.[imageField] || archivedRow?.[imageField] || null;
+  let filename = item.filename || path.split('/').pop() || '';
+  if (!imageUrl || shouldOverwrite) {
+    const downloaded = await downloadNutstoreFile(path);
+    filename = downloaded.filename || filename;
+    imageUrl = await uploadImageBuffer(sb, { sku, slot, filename, buffer: downloaded.buffer, contentType: downloaded.contentType });
+  }
   const now = new Date().toISOString();
-  const payload = buildArchivePayload(item, { sku, imageUrl, filename, now });
+  const payload = buildArchivePayload(item, { sku, slot, imageUrl, filename, now });
   const title = payload.title;
 
   let archiveAction = 'create';
 
   if (liveRow) {
-    const shouldOverwrite = item.overwriteImage || item.warnings?.includes('image_exists') || !liveRow.image_url_one;
+    const replaceLiveImage = item.overwriteImage || item.warnings?.includes('image_exists') || !liveRow[imageField];
     const livePatch = {
       title: payload.title,
       price: payload.price,
@@ -209,8 +225,8 @@ async function archiveOne(sb, item) {
       original_description: payload.original_description,
       updated_at: now,
     };
-    if (shouldOverwrite || !liveRow.image_url_one) {
-      livePatch.image_url_one = imageUrl;
+    if (replaceLiveImage || !liveRow[imageField]) {
+      livePatch[imageField] = imageUrl;
     }
     if (item.sqlRow?.onhand != null) livePatch.stock_qty = Number(item.sqlRow.onhand);
     if (item.sqlRow?.available != null) livePatch.available_stock = Number(item.sqlRow.available);
@@ -235,7 +251,7 @@ async function archiveOne(sb, item) {
     action: archiveAction === 'create' ? 'create' : 'update',
     source: 'nutstore_product_loader',
     publishMode: 'archive',
-    imageSlot: 1,
+    imageSlot: slot,
     imageSource: 'nutstore',
     newValues: {
       outcome: 'archived',
