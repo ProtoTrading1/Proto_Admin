@@ -6417,8 +6417,8 @@ html, body { background: #f5f5f5; color: #111827; }
 .oa-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .oa-table th, .oa-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #f1f5f9; }
 .oa-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
-.oa-hub { display: grid; gap: 16px; align-content: start; }
-.oa-hub-tabs { margin-bottom: 0; }
+.oa-hub { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+.oa-hub-tabs { min-width: 0; margin-bottom: 0; }
 /* Holds the page height steady while a tab's chunk and data load, so the
    tab strip stays put instead of the content collapsing underneath it. */
 .oa-hub-view { min-height: 70vh; }
@@ -6448,6 +6448,12 @@ html, body { background: #f5f5f5; color: #111827; }
 .ia-method summary { color: #0f172a; font-weight: 700; cursor: pointer; }
 .ia-method p { max-width: 85ch; }
 .ia-dashboard :is(button, select, summary, .ia-bar-slot):focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .adm-customer-tabs.oa-hub-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oa-hub-view, .ia-dashboard { min-width: 0; }
+  .ia-status span, .ia-meta { overflow-wrap: anywhere; }
+}
 
 /* --- Abandoned Baskets ------------------------------------------------- */
 /* Type, cards and badges come from the shared analytics + admin scales
