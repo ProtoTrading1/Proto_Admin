@@ -6452,6 +6452,7 @@ html, body { background: #f5f5f5; color: #111827; }
 @media (max-width: 600px) {
   .adm-customer-tabs.oa-hub-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .oa-hub-view, .ia-dashboard { min-width: 0; }
+  .ia-dashboard { grid-template-columns: minmax(0, 1fr); }
   .ia-status span, .ia-meta { overflow-wrap: anywhere; }
 }
 
