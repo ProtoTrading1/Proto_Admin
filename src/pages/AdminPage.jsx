@@ -1,4 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useProductLoaderLeaveGuard } from '../hooks/useProductLoaderLeaveGuard';
 import {
   Archive,
   ArchiveRestore,
@@ -558,13 +559,14 @@ function WhatsappOptIn({ value }) {
 export default function AdminPage({ customer, onViewPortal, onSignOut }) {
   const initialOrderWorkspaceId = useMemo(() => orderWorkspaceIdFromPath(), []);
   const allowedSectionIds = useMemo(() => sectionsForAdminRole(customer?.role), [customer?.role]);
-  const [activeSection, setActiveSection] = useState(() => {
+  const [activeSection, setActiveSectionState] = useState(() => {
     return initialAdminSectionFromSearch({
       search: window.location.search,
       allowedSectionIds,
       hasOrderWorkspace: Boolean(initialOrderWorkspaceId),
     });
   });
+  const { onPendingWorkChange: onProductLoaderPendingWorkChange, confirmLeave: confirmProductLoaderLeave, requestSectionChange: setActiveSection } = useProductLoaderLeaveGuard(setActiveSectionState);
   const [productLoaderCode, setProductLoaderCode] = useState('');
   const [imageProcessingHandoff, setImageProcessingHandoff] = useState(() => ({
     nutstoreSelection: loadPendingNutstoreHandoff(),
@@ -933,13 +935,14 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
   const openProductManagerForSku = useCallback((sku) => {
     const cleanSku = String(sku || '').trim().toUpperCase();
     if (!cleanSku) return;
+    if (!setActiveSection('catalogue')) return;
     setProductManagerSearch(cleanSku);
-    setActiveSection('catalogue');
     setLoadingError('');
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
+  }, [setActiveSection]);
 
   const openImageProcessingCentre = useCallback((handoff = {}) => {
+    if (!setActiveSection('image-processing')) return;
     const nutstoreSelection = savePendingNutstoreHandoff(
       Array.isArray(handoff.nutstoreSelection) ? handoff.nutstoreSelection : [],
     );
@@ -947,10 +950,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
       nutstoreSelection,
       uploadSelection: Array.isArray(handoff.uploadSelection) ? handoff.uploadSelection : [],
     });
-    setActiveSection('image-processing');
     setLoadingError('');
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
+  }, [setActiveSection]);
 
   const consumeNutstoreHandoff = useCallback(() => {
     clearPendingNutstoreHandoff();
@@ -2423,9 +2425,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
             <LiveShoppersDot />
             <button type="button" onClick={goHome} className="adm-btn-ghost" aria-label="Home"><Home size={15} /><span className="adm-btn-text">Home</span></button>
             <button onClick={() => void refreshCurrentSection()} className="adm-btn-ghost" aria-label="Refresh"><RefreshCw size={15} /><span className="adm-btn-text">Refresh</span></button>
-            <button onClick={onViewPortal} className="adm-btn-ghost" aria-label="Portal"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
+            <button onClick={() => { if (confirmProductLoaderLeave()) onViewPortal?.(); }} className="adm-btn-ghost" aria-label="Portal"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
             {onSignOut && (
-              <button type="button" onClick={onSignOut} className="adm-btn-ghost" title={customer?.email || 'Sign out'} aria-label="Sign out">
+              <button type="button" onClick={() => { if (confirmProductLoaderLeave()) onSignOut(); }} className="adm-btn-ghost" title={customer?.email || 'Sign out'} aria-label="Sign out">
                 <Lock size={15} /><span className="adm-btn-text">Sign out</span>
               </button>
             )}
@@ -2453,7 +2455,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                   setSidebarOpen(false);
                   return;
                 }
-                setActiveSection(id);
+                if (!setActiveSection(id)) return;
                 setLoadingError('');
                 setSidebarOpen(false);
                 if (id === 'catalogue' || id === 'reorder') {
@@ -2570,6 +2572,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
               <SectionErrorBoundary name="product-loader" title="Product Loader crashed" resetKey={activeSection}>
                 <Suspense fallback={<LazySectionFallback label="Loading Product Loader…" />}>
                 <ProductLoaderPanel
+                  onPendingWorkChange={onProductLoaderPendingWorkChange}
                   taxonomyTree={taxonomyTree}
                   onShowToast={showToast}
                   initialCode={productLoaderCode}

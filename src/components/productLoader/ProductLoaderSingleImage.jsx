@@ -8,7 +8,8 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { isImageFile, websiteStatusLabel } from '../../lib/parseIntakeFilename';
+import { websiteStatusLabel } from '../../lib/parseIntakeFilename';
+import { INTAKE_IMAGE_ACCEPT, inspectIntakeImageSelection } from '../../lib/intakeImageSelection';
 import { archiveLoaderImageItem, lookupFilenames, logPublishFailure, publishLoaderImageItem } from '../../lib/productLoaderApi';
 import { catalogueDisplayTitle, loaderCodeLabel } from '../../lib/productLoaderDisplay.js';
 import LoaderCodeEllipsis from './LoaderCodeEllipsis.jsx';
@@ -59,14 +60,15 @@ export default function ProductLoaderSingleImage({
   };
 
   const handleSelect = async (fileList) => {
-    const file = [...(fileList || [])].filter(isImageFile)[0];
+    const selection = inspectIntakeImageSelection(fileList);
+    const file = selection.accepted[0];
     if (!file) {
-      setError('Please choose an image file (JPG, PNG, or WebP).');
+      setError(selection.message);
       return;
     }
     setScanning(true);
-    setError('');
     clear();
+    setError(selection.message);
     try {
       const [row] = await lookupFilenames([file.name], [file]);
       if (!row) throw new Error('Lookup failed');
@@ -146,7 +148,7 @@ export default function ProductLoaderSingleImage({
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept={INTAKE_IMAGE_ACCEPT}
           hidden
           onChange={(e) => { void handleSelect(e.target.files); e.target.value = ''; }}
         />

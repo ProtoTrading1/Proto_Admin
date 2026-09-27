@@ -24,6 +24,7 @@
     "@tanstack/react-query-persist-client": "^5.101.0",
     "@tanstack/react-virtual": "^3.14.4",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "3.9.9",
     "exceljs": "^3.4.0",
     "jimp": "^1.6.1",
     "jspdf": "^4.2.1",

@@ -80,6 +80,15 @@ export function parseLoaderFilename(filename) {
   };
 }
 
+// Landed Instore stock is keyed by Positill's ten-digit item code. Supplier
+// image suffixes such as -1, .2 or " (2)" identify photographs, not sellable
+// products. Require a boundary after exactly ten leading digits so an 11-digit
+// code or an embedded barcode is never silently matched to another product.
+export function landedPositillSku(parsed) {
+  const fullCode = String(parsed?.fullCode || parsed?.code || '').trim().toUpperCase();
+  return fullCode.match(/^(\d{10})(?=$|[._\s(-])/)?.[1] || fullCode;
+}
+
 /** Sibling SKU a duplicate copy publishes to: CODE, CODE-2, CODE-3… */
 export function siblingSkuForCopy(baseSku, copyIndex) {
   const sku = String(baseSku || '').trim().toUpperCase();

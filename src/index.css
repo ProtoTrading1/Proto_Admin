@@ -6424,6 +6424,31 @@ html, body { background: #f5f5f5; color: #111827; }
 .oa-hub-view { min-height: 70vh; }
 .oa-loading--reserved { align-items: center; min-height: 60vh; gap: 10px; }
 
+/* Instore analytics: evidence first, with legacy traffic tracking clearly set aside. */
+.ia-heading h2 { margin: 0; color: #0f172a; font-size: 22px; line-height: 1.2; }
+.ia-heading p { margin: 5px 0 0; color: #475569; font-size: 14px; }
+.ia-status { display: flex; gap: 10px; align-items: flex-start; padding: 13px 15px; background: #fffbeb; color: #78350f; border: 1px solid #fcd34d; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+.ia-status svg { flex: none; margin-top: 1px; }
+.ia-meta { margin: 0; color: #475569; font-size: 13px; line-height: 1.5; }
+.ia-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ia-stat-grid .oa-stat-label { color: #475569; }
+.ia-stat-grid p { margin: 8px 0 0; color: #475569; font-size: 12px; line-height: 1.4; }
+.ia-section-note { margin: 4px 0 0; color: #475569; font-size: 12px; line-height: 1.4; }
+.ia-chart-scroll { overflow-x: auto; padding-bottom: 5px; }
+.ia-bars { display: flex; align-items: flex-end; gap: 7px; height: 190px; min-width: 580px; border-bottom: 1px solid #cbd5e1; }
+.ia-bar-slot { display: flex; flex: 1; min-width: 13px; height: 100%; flex-direction: column; align-items: center; justify-content: flex-end; outline-offset: 3px; }
+.ia-bar-count { color: #334155; font-size: 10px; min-height: 14px; }
+.ia-bar { display: block; width: min(100%, 32px); background: #16803d; border-radius: 4px 4px 0 0; }
+.ia-bar-label { color: #475569; font-size: 10px; white-space: nowrap; padding-top: 5px; min-height: 19px; }
+.ia-sort { display: flex; align-items: center; gap: 7px; color: #334155; font-size: 12px; font-weight: 700; }
+.ia-sort select { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #0f172a; font: inherit; }
+.ia-code { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ia-show-all { margin-top: 12px; padding: 8px 0; border: 0; background: none; color: #166534; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ia-method { padding: 12px 15px; border: 1px solid #e2e8f0; border-radius: 9px; color: #475569; font-size: 13px; line-height: 1.5; }
+.ia-method summary { color: #0f172a; font-weight: 700; cursor: pointer; }
+.ia-method p { max-width: 85ch; }
+.ia-dashboard :is(button, select, summary, .ia-bar-slot):focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+
 /* --- Abandoned Baskets ------------------------------------------------- */
 /* Type, cards and badges come from the shared analytics + admin scales
    (.oa-panel h3, .oa-subhead, .oa-stat-*, .adm-product-thumb) — only the
@@ -6565,8 +6590,13 @@ html, body { background: #f5f5f5; color: #111827; }
 .sa-empty-banner__meta { font-size: 12px; color: #92400e; margin: 0; }
 @media (max-width: 900px) {
   .oa-stat-grid, .oa-split, .oa-peak-grid, .oa-insights-row { grid-template-columns: 1fr; }
+  .ia-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sa-stat-grid--5 { grid-template-columns: 1fr 1fr; }
   .sa-stat-grid--4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .ia-stat-grid { grid-template-columns: 1fr; }
+  .ia-heading h2 { font-size: 19px; }
 }
 
 .oa-wa-notify {
@@ -7453,6 +7483,37 @@ html, body { background: #f5f5f5; color: #111827; }
 }
 .pl-folder-table thead th { background: #f8fafc; position: sticky; top: 0; }
 .pl-folder-thumb { width: 40px; height: 40px; object-fit: contain; border-radius: 4px; background: #f8fafc; }
+
+/* Shared shipment setup; the review cards have their own scoped stylesheet. */
+.pl-section--instore .pl-section-note--instore { margin-bottom: 10px; max-width: 760px; }
+.pl-section--instore .pl-action-row { margin-top: 8px; }
+.pl-instore-summary {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  padding: 9px 12px; margin: 10px 0; border: 1px solid #dbe4f0;
+  border-radius: 8px; background: #f8fafc; font-size: 12px; color: #64748b;
+}
+.pl-instore-summary strong { color: #14213d; font-size: 14px; }
+.pl-stock-source-choice {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  flex-basis: 100%; margin: 10px 0; padding: 10px 12px;
+  border: 1px solid #dbe4f0; border-radius: 8px; min-width: 0;
+}
+.pl-stock-source-choice legend { padding: 0 4px; font-size: 12px; font-weight: 700; color: #14213d; }
+.pl-stock-source-choice .adm-muted { flex-basis: 100%; }
+.pl-stock-source-choice label { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.pl-instore-import-blocker { color: #9a3412; font-size: 13px; line-height: 1.4; }
+.pl-shared-family-photo {
+  margin: 12px 0; padding: 12px; border: 1px solid #dbe4f0;
+  border-radius: 8px; background: #f8fafc;
+}
+.pl-shared-family-photo summary { cursor: pointer; font-weight: 700; color: #14213d; }
+.pl-shared-family-photo p, .pl-shared-family-photo small { display: block; color: #475569; line-height: 1.45; }
+.pl-shared-family-photo label { display: block; margin: 10px 0; font-size: 13px; font-weight: 600; }
+.pl-shared-family-photo select, .pl-shared-family-photo input {
+  display: block; width: 100%; max-width: 550px; min-height: 40px;
+  margin-top: 5px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;
+}
+.pl-shared-family-photo button { min-height: 40px; }
 
 /* Owner-only Image Processing Centre */
 .ipc-instore-image-control {

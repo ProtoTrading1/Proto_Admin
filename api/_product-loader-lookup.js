@@ -5,11 +5,11 @@ import {
   looksLikeExVatPrice,
   resolveLoaderCustomerPrice,
 } from '../lib/catalogue-price.mjs';
-import { getProductByCode, resolveProductByCode } from './_sql-provider.js';
+import { resolveProductByCode } from './_sql-provider.js';
 import { toSqlPreview } from './_sql-stmast.js';
 import { parseLoaderFilename } from './_product-loader-filename.js';
 import { fetchProductLookupMap, findProductBySku } from './_sku-match.js';
-import { normalizeUnitsOfIssue } from '../lib/selling-unit.mjs';
+import { inferExplicitPiecePackFromDescription, normalizeUnitsOfIssue } from '../lib/selling-unit.mjs';
 
 export { parseLoaderFilename } from './_product-loader-filename.js';
 
@@ -117,11 +117,25 @@ async function lookupPositill(sb, code, displayCode) {
 
 async function lookupPositillStrict(sb, code) {
   const upper = String(code || '').trim().toUpperCase();
-  if (!upper) return { sqlRow: null, matchedBy: null };
-  const sqlRow = await getProductByCode(upper).catch(() => null);
-  return sqlRow
-    ? { sqlRow: toSqlPreview(sqlRow), matchedBy: 'positill_code' }
-    : { sqlRow: null, matchedBy: null };
+  if (!upper) return { sqlRow: null, matchedBy: null, positillSource: null, bridgeAttempted: false };
+  const resolved = await resolveProductByCode(upper)
+    .catch(() => ({ product: null, dataSource: null, bridgeAttempted: true }));
+  // A landed shipment may override zero current stock with its received-stock
+  // Excel, but it may never use a cached Positill record for sellable data.
+  if (resolved.dataSource === 'erp_sql' && resolved.product) {
+    return {
+      sqlRow: toSqlPreview(resolved.product),
+      matchedBy: 'positill_code',
+      positillSource: 'erp_sql',
+      bridgeAttempted: resolved.bridgeAttempted,
+    };
+  }
+  return {
+    sqlRow: null,
+    matchedBy: null,
+    positillSource: resolved.dataSource || null,
+    bridgeAttempted: resolved.bridgeAttempted,
+  };
 }
 
 export function resolveWebsiteStatus({ websiteRow, sqlRow, dormantSkus, code }) {
@@ -132,6 +146,12 @@ export function resolveWebsiteStatus({ websiteRow, sqlRow, dormantSkus, code }) 
   return 'not_found';
 }
 
+function cachedLookup(cache, key, lookup) {
+  if (!cache) return lookup();
+  if (!cache.has(key)) cache.set(key, Promise.resolve().then(lookup));
+  return cache.get(key);
+}
+
 export async function resolveProductLoaderMatch(sb, {
   code,
   fullCode = null,
@@ -140,6 +160,7 @@ export async function resolveProductLoaderMatch(sb, {
   dormantSkus = null,
   parseError = null,
   strictExact = false,
+  lookupCache = null,
 }) {
   if (parseError) {
     return {
@@ -168,11 +189,19 @@ export async function resolveProductLoaderMatch(sb, {
   const upperFull = String(fullCode || '').trim().toUpperCase();
   const upperCode = String(code || '').trim().toUpperCase();
   const attempts = [];
-  if (upperFull && upperFull !== upperCode) {
-    attempts.push({ candidate: fullCode, slot: 1 });
-  }
-  for (const candidate of codeLookupCandidates(code)) {
-    attempts.push({ candidate, slot: clampedSlot });
+  if (strictExact) {
+    // A landed shipment may never fall back from its filename's exact SKU to
+    // a shorter family code, a related colour, or a slot interpretation.
+    // That would pair the received quantity and image with the wrong product.
+    const exactCode = upperFull || upperCode;
+    if (exactCode) attempts.push({ candidate: exactCode, slot: clampedSlot });
+  } else {
+    if (upperFull && upperFull !== upperCode) {
+      attempts.push({ candidate: fullCode, slot: 1 });
+    }
+    for (const candidate of codeLookupCandidates(code)) {
+      attempts.push({ candidate, slot: clampedSlot });
+    }
   }
 
   let websiteRow = null;
@@ -187,10 +216,10 @@ export async function resolveProductLoaderMatch(sb, {
   for (const attempt of attempts) {
     const [webResult, positill] = await Promise.all([
       strictExact
-        ? lookupWebsiteStockStrict(sb, attempt.candidate)
+        ? cachedLookup(lookupCache, `website:${attempt.candidate}`, () => lookupWebsiteStockStrict(sb, attempt.candidate))
         : lookupWebsiteStock(sb, attempt.candidate, displayCode),
       strictExact
-        ? lookupPositillStrict(sb, attempt.candidate)
+        ? cachedLookup(lookupCache, `positill:${attempt.candidate}`, () => lookupPositillStrict(sb, attempt.candidate))
         : lookupPositill(sb, attempt.candidate, displayCode),
     ]);
     if (webResult.row || positill.sqlRow) {
@@ -222,9 +251,18 @@ export async function resolveProductLoaderMatch(sb, {
     sqlRow?.code || websiteRow?.barcode || effectiveCode || '',
   ).trim().toUpperCase();
   const productLookup = productCode
-    ? await fetchProductLookupMap(sb, [productCode], 'sku, sell_price, units_of_issue').catch(() => new Map())
+    // Unit of issue is canonical backend data.  `pack_description` is an
+    // optional legacy field and must not make the entire product lookup fail.
+    ? await cachedLookup(lookupCache, `product:${productCode}`, () =>
+      fetchProductLookupMap(sb, [productCode], 'sku, sell_price, units_of_issue').catch(() => new Map()))
     : new Map();
   const productRow = findProductBySku(productLookup, productCode);
+  // The live Positill row is authoritative for new landed stock. The product
+  // mirror is retained only as a compatibility fallback for older bridge rows.
+  const explicitDescriptionUnit = inferExplicitPiecePackFromDescription(sqlRow?.title || websiteRow?.title || '');
+  const canonicalUnitRaw = String(
+    sqlRow?.units_of_issue || productRow?.units_of_issue || websiteRow?.units_of_issue || explicitDescriptionUnit || '',
+  ).trim();
   const rawPositillPrice = Number(sqlRow?.price) || 0;
   const resolvedPrice = resolveLoaderCustomerPrice({
     productSellPrice: productRow?.sell_price,
@@ -269,9 +307,24 @@ export async function resolveProductLoaderMatch(sb, {
     bridgeAttempted,
     erpPriceExVat: rawPositillPrice || null,
     productSellPrice: productRow?.sell_price != null ? Number(productRow.sell_price) : null,
-    unitsOfIssue: normalizeUnitsOfIssue(
-      websiteRow?.units_of_issue || productRow?.units_of_issue || 'EACH',
-    ),
+    // Landed shipments must use this canonical product record. A website
+    // fallback is deliberately not enough: the item may not yet be live.
+    canonicalSellingUnitKnown: Boolean(canonicalUnitRaw),
+    sellingUnitSource: sqlRow?.units_of_issue
+      ? 'positill_live'
+      : productRow?.units_of_issue
+        ? 'positill_backend'
+        : websiteRow?.units_of_issue
+          ? 'website_backend'
+          : explicitDescriptionUnit
+            ? 'positill_description_explicit'
+            : 'missing',
+    // Do not manufacture EACH for strict landed-shipment review. It receives
+    // physical pieces, so an unresolved selling unit is deliberately blank
+    // and the row is ineligible until Positill data resolves it.
+    unitsOfIssue: canonicalUnitRaw
+      ? normalizeUnitsOfIssue(canonicalUnitRaw)
+      : (strictExact ? '' : 'EACH'),
     packDescription: String(websiteRow?.pack_description || '').trim(),
     imageSlot: slot,
     sqlRow,
@@ -302,6 +355,20 @@ export async function fetchDormantSkuSet(sb) {
     for (const row of data || []) skus.add(row.sku);
     if ((data || []).length < PAGE) break;
     from += PAGE;
+  }
+  return skus;
+}
+
+// A folder needs the archive state of its own SKUs, not the entire archive.
+// Keep requests small enough for PostgREST URL limits and fail closed on error.
+export async function fetchDormantSkuSetForCodes(sb, codes) {
+  const skus = new Set();
+  const unique = [...new Set(codes.map((code) => String(code || '').trim().toUpperCase()).filter(Boolean))];
+  for (let from = 0; from < unique.length; from += 100) {
+    const { data, error } = await sb.from('archived_products').select('sku')
+      .eq('archived_by', 'new-products').in('sku', unique.slice(from, from + 100));
+    if (error) throw error;
+    for (const row of data || []) skus.add(String(row.sku || '').trim().toUpperCase());
   }
   return skus;
 }

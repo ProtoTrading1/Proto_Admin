@@ -311,11 +311,13 @@ export default function OrderAnalyticsDashboard() {
             <section className="oa-panel">
               <PanelHeader title="Most Viewed Products (Top 10)" onExport={exportViewedProducts} />
               {!data.trackingEnabled && <p className="oa-note">Product view tracking activates after the portal migration is applied.</p>}
+              {data.trackingSampled && <p className="oa-note">Event counts are from a limited sample, not the full period.</p>}
               <HorizontalBars rows={topViewedProducts} valueKey="views" labelKey="label" max={10} />
             </section>
             <section className="oa-panel">
               <PanelHeader title="Most Viewed Categories" />
               {!data.trackingEnabled && <p className="oa-note">Category view tracking activates after the portal migration is applied.</p>}
+              {data.trackingSampled && <p className="oa-note">Event counts are incomplete; category events can also include automatic repeats. Do not read these as customer visits.</p>}
               <DonutChart slices={data.topViewedCategories?.map((c) => ({ label: c.label, count: c.views }))} />
             </section>
           </div>

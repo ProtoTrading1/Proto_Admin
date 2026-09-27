@@ -279,6 +279,7 @@ export default async function handler(req, res) {
     topOrderedCategories,
     topViewedProducts: viewCounts('product_view'),
     topViewedCategories: viewCounts('category_view'),
+    trackingSampled: !eventsRes.error && events.length >= 1000,
     orderStatusBreakdown,
     peakByDay: byDay,
     peakByHour: byHour,

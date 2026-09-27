@@ -15,6 +15,7 @@ import categories from '../data/categories.json';
 import { isImageFile } from '../lib/parseIntakeFilename.js';
 import { readApiJson } from '../lib/apiError.js';
 import ProductLoaderNutstore from './productLoader/ProductLoaderNutstore';
+import ProductLoaderSingleImage from './productLoader/ProductLoaderSingleImage';
 import ProductLoaderUpload from './productLoader/ProductLoaderUpload';
 import ProductLoaderVariantImport from './productLoader/ProductLoaderVariantImport';
 import ProductLoaderPublishSuccess from './productLoader/ProductLoaderPublishSuccess';
@@ -24,7 +25,9 @@ import { catalogueDisplayTitle, catalogueDescription } from '../lib/productLoade
 
 const LOADER_TABS = [
   { id: 'nutstore', label: 'Nutstore' },
-  { id: 'upload', label: 'Upload' },
+  { id: 'single', label: 'Single Image' },
+  { id: 'upload', label: 'Multiple Images' },
+  { id: 'landed', label: 'Landed Shipment' },
   { id: 'variants', label: 'Excel + Images' },
 ];
 
@@ -158,7 +161,7 @@ export default function ProductLoaderPanel({
   mainSiteUrl = 'https://site.proto.co.za',
   publishedBy = '',
   isOwner = false,
-  initialTab = 'nutstore',
+  initialTab = 'upload',
   onOpenProductManager,
   onOpenImageProcessing,
   onOpenNutstore,
@@ -168,9 +171,11 @@ export default function ProductLoaderPanel({
   onIntakeOptionsChange,
   onNutstoreSelectionConsumed,
   onUploadSelectionConsumed,
+  onPendingWorkChange,
 }) {
   const standaloneImageProcessing = initialTab === 'image-processing' && isOwner;
-  const [activeTab, setActiveTab] = useState('nutstore');
+  const [activeTab, setActiveTab] = useState(initialTab === 'nutstore' ? 'nutstore' : 'landed');
+  const [landedVisited, setLandedVisited] = useState(initialTab !== 'nutstore');
   const [publishSuccess, setPublishSuccess] = useState(null);
   const fileRef = useRef(null);
   const folderRef = useRef(null);
@@ -705,9 +710,8 @@ export default function ProductLoaderPanel({
   useEffect(() => {
     const c = String(initialCode || '').trim();
     if (!c) return;
-    // A hand-off with a code routes to the Upload tab (the only image workflow
-    // now that Single/Folder are merged); the lookup still runs in the background.
-    setActiveTab('upload');
+    // A hand-off with one code belongs in the dedicated single-image workflow.
+    setActiveTab('single');
     void handleLookup(c).finally(() => onInitialCodeConsumed?.());
   }, [initialCode]);
 
@@ -909,7 +913,7 @@ export default function ProductLoaderPanel({
   };
 
   const openAdvanced = (code) => {
-    setActiveTab('upload');
+    setActiveTab('single');
     onShowToast?.(`Open Single Image tab and upload an image for ${code}`, 'success');
   };
 
@@ -963,7 +967,7 @@ export default function ProductLoaderPanel({
             key={tab.id}
             type="button"
             className={`pl-tab${activeTab === tab.id ? ' pl-tab--on' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => { setActiveTab(tab.id); if (tab.id === 'landed') setLandedVisited(true); }}
           >
             {tab.label}
           </button>
@@ -987,6 +991,19 @@ export default function ProductLoaderPanel({
         />
       )}
 
+      {activeTab === 'single' && (
+        <ProductLoaderSingleImage
+          taxonomyTree={taxonomyTree}
+          batchDefaultPathIds={batchDefaultPathIds}
+          setBatchDefaultPathIds={setBatchDefaultPathIds}
+          batchOverwrite={batchOverwrite}
+          setBatchOverwrite={setBatchOverwrite}
+          onShowToast={onShowToast}
+          onPublished={(result) => setPublishSuccess(result)}
+          mainSiteUrl={mainSiteUrl}
+        />
+      )}
+
       {activeTab === 'upload' && (
         <ProductLoaderUpload
           taxonomyTree={taxonomyTree}
@@ -1001,6 +1018,24 @@ export default function ProductLoaderPanel({
         />
       )}
 
+      {landedVisited && (
+        <div className="pl-landed-panel" hidden={!(activeTab === 'landed')}>
+        <ProductLoaderUpload
+          onPendingWorkChange={onPendingWorkChange}
+          taxonomyTree={taxonomyTree}
+          batchDefaultPathIds={batchDefaultPathIds}
+          setBatchDefaultPathIds={setBatchDefaultPathIds}
+          batchOverwrite={batchOverwrite}
+          setBatchOverwrite={setBatchOverwrite}
+          onShowToast={onShowToast}
+          instoreOnly
+          onProcessFiles={(files) => {
+            onOpenImageProcessing?.({ nutstoreSelection: [], uploadSelection: files });
+          }}
+        />
+        </div>
+      )}
+
       {activeTab === 'variants' && (
         <ProductLoaderVariantImport
           publishedBy={publishedBy}
@@ -1013,7 +1048,7 @@ export default function ProductLoaderPanel({
         <ProductLoaderPublishSuccess
           result={publishSuccess}
           mainSiteUrl={mainSiteUrl}
-          onUploadNext={() => { setPublishSuccess(null); setActiveTab("upload"); }}
+          onUploadNext={() => { setPublishSuccess(null); setActiveTab("single"); }}
           onDone={() => setPublishSuccess(null)}
         />
       )}
