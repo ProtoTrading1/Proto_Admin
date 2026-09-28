@@ -3067,7 +3067,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                 )}
                 {orderTab === 'paid' && (
                   <p className="adm-muted" style={{ fontSize: 12, margin: '0 0 12px' }}>
-                    Payment tab includes sent confirmations awaiting payment.
+                    This tab shows confirmations awaiting payment and orders already marked Payment Received.
                   </p>
                 )}
                 {ordersError && (
