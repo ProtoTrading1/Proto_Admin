@@ -2,6 +2,8 @@
 import React, { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
+import { fetchOrdersPage } from '../src/lib/orders';
+import { displayOrderNumber } from '../src/lib/orderNumber';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -44,14 +46,14 @@ vi.mock('../src/lib/orderDocuments', () => ({
 vi.mock('../src/lib/orderNumber', () => ({ displayOrderNumber: vi.fn(), buildFulfillmentUrl: vi.fn() }));
 vi.mock('../src/lib/presaleInvoice', () => ({ fetchPresaleInvoices: vi.fn(), uploadPresaleInvoice: vi.fn() }));
 vi.mock('../src/lib/orderPayment', () => ({
-  fetchConfirmationSent: vi.fn(), markConfirmationSent: vi.fn(), fetchPaymentRecords: vi.fn(),
+  fetchConfirmationSent: vi.fn(() => Promise.resolve({})), markConfirmationSent: vi.fn(), fetchPaymentRecords: vi.fn(() => Promise.resolve({})),
   uploadPop: vi.fn(), setPaymentStatus: vi.fn(),
 }));
 vi.mock('../src/lib/orders', () => ({
   deleteOrderAdmin: vi.fn(), fetchOrdersPage: vi.fn(() => Promise.resolve({ rows: [], total: 0 })),
   updateOrderAdmin: vi.fn(), advanceOrderWorkflow: vi.fn(),
 }));
-vi.mock('../src/lib/orderTeamWhatsapp', () => ({ fetchTeamWhatsappSent: vi.fn(), sendTeamWhatsapp: vi.fn() }));
+vi.mock('../src/lib/orderTeamWhatsapp', () => ({ fetchTeamWhatsappSent: vi.fn(() => Promise.resolve({})), sendTeamWhatsapp: vi.fn() }));
 vi.mock('../src/lib/orderStatus', () => ({
   orderMatchesTab: vi.fn(() => true),
   normalizeOrderStatus: vi.fn((status) => status || ''),
@@ -128,6 +130,9 @@ describe('AdminPage mounted section routing', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.clearAllMocks();
+    vi.mocked(fetchOrdersPage).mockImplementation(async () => ({ rows: [], total: 0 }));
+    vi.mocked(displayOrderNumber).mockImplementation((order) => order.order_number || 'PT_TEST');
     globalThis.React = React;
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -167,5 +172,42 @@ describe('AdminPage mounted section routing', () => {
     await renderAt('?section=image-processing', { id: '2', name: 'CS', email: 'cs@example.test', role: 'customer_service' });
     expect(document.body.textContent).not.toContain('Image Processing Centre mounted');
     expect(window.location.search).toBe('?section=orders');
+  });
+
+  it('keeps a pending order-tab request when focus refreshes and opens its details accessibly', async () => {
+    let resolveAll;
+    const sample = {
+      id: 'order-test', order_number: 'PT_TEST', created_at: '2026-09-28T08:00:00Z',
+      status: 'handed over', total_ex_vat: 100,
+      customers: { name: 'Test Customer', email: 'customer@example.test' },
+      items: [{ code: 'SKU-1', name: 'Long sample product name', qty: 2, price: 50 }],
+    };
+    vi.mocked(fetchOrdersPage).mockImplementation(({ tab }) => tab === 'all'
+      ? new Promise((resolve) => { resolveAll = resolve; })
+      : Promise.resolve({ rows: [], total: 0 }));
+    await renderAt('?section=orders');
+    await act(async () => {
+      [...container.querySelectorAll('button')].find((button) => button.textContent.includes('All orders')).click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await Promise.resolve();
+    });
+    expect(vi.mocked(fetchOrdersPage).mock.calls.filter(([args]) => args.tab === 'all')).toHaveLength(1);
+    await act(async () => { resolveAll({ rows: [sample], total: 1 }); await Promise.resolve(); });
+    expect(container.textContent).not.toContain('Loading orders…');
+    const detailsButton = container.querySelector('.adm-order-expand-btn');
+    expect(detailsButton?.getAttribute('aria-label')).toContain('View details for order PT_TEST');
+    await act(async () => { detailsButton.click(); });
+    expect(detailsButton.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('#order-detail-order-test')?.textContent).toContain('Test Customer');
+  });
+
+  it('shows a retryable error instead of claiming an unavailable tab is empty', async () => {
+    vi.mocked(fetchOrdersPage).mockRejectedValue(new Error('Orders took too long to load. Please try again.'));
+    await renderAt('?section=orders');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Try again');
+    expect(container.textContent).not.toContain('No orders in this tab.');
   });
 });

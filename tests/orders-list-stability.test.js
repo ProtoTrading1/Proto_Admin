@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const source = fs.readFileSync(new URL('../src/pages/AdminPage.jsx', import.meta.url), 'utf8');
+const loadOrdersBlock = source.slice(source.indexOf('const loadOrders = async'), source.indexOf('loadOrdersRef.current = loadOrders'));
 
 /**
  * "Orders disappear and only come back after another refresh."
@@ -21,9 +22,8 @@ describe('orders list repaint', () => {
   });
 
   it('compares against what is painted, not the captured state variable', () => {
-    const block = source.slice(source.indexOf('const loadOrders'), source.indexOf('const loadOrders') + 3000);
-    expect(block).toMatch(/const painted = paintedOrdersRef\.current;/);
-    expect(block).not.toMatch(/&& orders\.length === data\.rows\.length/);
+    expect(loadOrdersBlock).toMatch(/const painted = paintedOrdersRef\.current;/);
+    expect(loadOrdersBlock).not.toMatch(/&& orders\.length === data\.rows\.length/);
   });
 
   it('never skips the paint while nothing is on screen', () => {
@@ -31,9 +31,8 @@ describe('orders list repaint', () => {
   });
 
   it('keeps the painted ref in step with every paint', () => {
-    const block = source.slice(source.indexOf('const loadOrders'), source.indexOf('const loadOrders') + 3000);
     // Cache paint, blank-on-tab-change, and fresh-data paint all update it.
-    const updates = block.match(/paintedOrdersRef\.current = /g) || [];
+    const updates = loadOrdersBlock.match(/paintedOrdersRef\.current = /g) || [];
     expect(updates.length).toBeGreaterThanOrEqual(3);
   });
 

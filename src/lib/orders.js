@@ -10,8 +10,19 @@ export async function fetchOrdersPage({
     tab,
     search,
   });
-  const res = await fetch(`/api/admin-orders?${params}`);
-  const json = await res.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  let res;
+  let json;
+  try {
+    res = await fetch(`/api/admin-orders?${params}`, { signal: controller.signal });
+    json = await res.json();
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('Orders took too long to load. Please try again.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) throw new Error(json.error || 'Failed to fetch orders');
   return {
     rows: json.rows || [],
