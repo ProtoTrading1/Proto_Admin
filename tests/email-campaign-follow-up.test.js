@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { noRecordedOpenEmails } from '../lib/email-follow-up.mjs';
 
 const analytics = fs.readFileSync(new URL('../src/components/EmailAnalyticsPanel.jsx', import.meta.url), 'utf8');
 const broadcast = fs.readFileSync(new URL('../api/_send-email-broadcast.js', import.meta.url), 'utf8');
@@ -19,13 +20,23 @@ describe('email campaign follow-up audiences', () => {
     expect(broadcast).toContain("import { markCustomersEmailed, markCrmContactsEmailed }");
   });
 
-  it('provides the five recipient tabs and keeps bounced contacts out of follow-up', () => {
+  it('provides recipient-status tabs and keeps excluded contacts out of follow-up', () => {
     expect(analytics).toContain("label: 'All recipients'");
     expect(analytics).toContain("label: 'No recorded open'");
     expect(analytics).toContain("label: 'Opened, no click'");
     expect(analytics).toContain("label: 'Clicked'");
-    expect(analytics).toContain("label: 'Bounced / excluded'");
-    expect(analytics).toMatch(/!activeEmails\.has\(email\)/);
+    expect(analytics).toContain("label: 'Bounced'");
+    expect(analytics).toContain("label: 'Unsubscribed'");
+    expect(analytics).toContain("label: 'Spam complaints'");
+    expect(analytics).toContain('noRecordedOpenEmails(data.emails, data)');
+    const emails = ['eligible', 'opened', 'failed', 'bounced', 'opted-out', 'complained'];
+    expect(noRecordedOpenEmails(emails, {
+      accepted: new Set(emails.filter((email) => email !== 'failed')),
+      opened: new Set(['opened']),
+      bounced: new Set(['bounced']),
+      unsubscribed: new Set(['opted-out']),
+      complained: new Set(['complained']),
+    })).toEqual(['eligible']);
   });
 
   it('only prepares a follow-up draft and never sends it from analytics', () => {

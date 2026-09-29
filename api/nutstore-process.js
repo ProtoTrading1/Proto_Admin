@@ -540,9 +540,6 @@ async function publishOne(sb, item, { overwriteImage }) {
   const subcategoryOne = String(item.subcategoryOne || item.subcategory_one || category).trim();
   if (!category || !subcategoryOne) throw new Error('category and subcategoryOne required');
 
-  const { buffer, contentType, filename } = await downloadNutstoreFile(path);
-  const imageUrl = await uploadImageBuffer(sb, { sku, slot: 1, filename, buffer, contentType });
-
   const slot = 1;
   const imageField = SLOT_FIELDS[slot - 1];
   const { data: existing, error: lookupErr } = await sb
@@ -559,9 +556,14 @@ async function publishOne(sb, item, { overwriteImage }) {
     throw err;
   }
 
+  // A saved browser lookup can be stale. Re-read exact Positill PRICE_A before
+  // uploading the image so a failed price check leaves no orphaned asset.
+  const price = await legacyNutstoreUploadPrice(item, sku, existing?.price);
+  const { buffer, contentType, filename } = await downloadNutstoreFile(path);
+  const imageUrl = await uploadImageBuffer(sb, { sku, slot: 1, filename, buffer, contentType });
+
   const now = new Date().toISOString();
   const { title, description } = resolveCatalogTextFields(item);
-  const price = Number(item.price ?? item.sqlRow?.price ?? 0);
   const unitsOfIssue = normalizeUnitsOfIssue(
     item.unitsOfIssue || existing?.units_of_issue || 'EACH',
   );
@@ -635,7 +637,23 @@ function resolveCatalogTextFields(item) {
   };
 }
 
-function buildArchivePayload(item, { sku, imageUrl, filename, now }) {
+async function legacyNutstoreUploadPrice(item, sku, existingPrice = 0) {
+  if (item.sqlRow) {
+    const code = String(item.sqlRow.code || item.barcode || sku).trim().toUpperCase();
+    const raw = await fetchStmastRow(code);
+    if (!raw || String(raw.CODE || raw.code || '').trim().toUpperCase() !== code) {
+      throw new Error(`${code}: live Positill price could not be verified`);
+    }
+    const price = customerPriceFromPositill(sqlRowToPreview(raw).price);
+    if (price <= 0) throw new Error(`${code}: live Positill price is invalid`);
+    return price;
+  }
+  // A genuinely unmatched, manually priced image has no Positill ex-VAT
+  // amount to convert. Keep its entered inclusive price or existing price.
+  return Number(item.price) > 0 ? Number(item.price) : Number(existingPrice) || 0;
+}
+
+function buildArchivePayload(item, { sku, imageUrl, filename, now, price }) {
   const { category, subcategoryOne } = resolveArchiveCategories(item);
   const resolved = resolveCatalogTextFields(item);
   // Unmatched codes still archive — placeholder text until a code fix
@@ -647,7 +665,7 @@ function buildArchivePayload(item, { sku, imageUrl, filename, now }) {
     barcode: sku,
     title,
     original_description: description,
-    price: Number(item.price ?? item.sqlRow?.price ?? 0),
+    price,
     units_of_issue: normalizeUnitsOfIssue(item.unitsOfIssue || 'EACH'),
     pack_description: String(item.packDescription || '').trim(),
     category,
@@ -669,17 +687,18 @@ async function archiveOne(sb, item) {
 
   const [{ data: liveRow }, { data: archivedRow }] = await Promise.all([
     sb.from('website_stock').select('*').eq('sku', sku).maybeSingle(),
-    sb.from('archived_products').select('sku, archived_by').eq('sku', sku).maybeSingle(),
+    sb.from('archived_products').select('sku, archived_by, price').eq('sku', sku).maybeSingle(),
   ]);
 
   if (archivedRow && archivedRow.archived_by !== NUTSTORE_ARCHIVED_BY) {
     throw new Error(`SKU "${sku}" is archived as "${archivedRow.archived_by}"`);
   }
 
+  const price = await legacyNutstoreUploadPrice(item, sku, liveRow?.price || archivedRow?.price);
   const { buffer, contentType, filename } = await downloadNutstoreFile(path);
   const imageUrl = await uploadImageBuffer(sb, { sku, slot: 1, filename, buffer, contentType });
   const now = new Date().toISOString();
-  const payload = buildArchivePayload(item, { sku, imageUrl, filename, now });
+  const payload = buildArchivePayload(item, { sku, imageUrl, filename, now, price });
   const title = payload.title;
 
   let archiveAction = 'create';

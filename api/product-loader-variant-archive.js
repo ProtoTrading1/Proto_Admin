@@ -104,13 +104,19 @@ export default async function handler(req, res) {
       return res.status(422).json({ error: `Barcode "${barcode}" was not found in the product source.`, code: 'barcode_not_found' });
     }
     const positill = await resolveProductByCode(barcode).catch(() => ({ product: null, dataSource: null }));
+    if (positill.dataSource !== 'erp_sql') {
+      return res.status(503).json({
+        error: 'Archiving paused because the live Positill price could not be verified. Retry when Live Positill SQL is connected.',
+        code: 'live_price_unavailable',
+      });
+    }
     const safeValues = canonicalPublishValues({
       product: canonical,
       livePositill: positill.product,
       positillSource: positill.dataSource,
       existing: null,
       submitted: { price: body.price, stockQty: body.stockQty, availableStock: body.availableStock },
-      priceBasis: 'vat_inclusive',
+      priceBasis: 'erp_ex_vat',
     });
     if (safeValues.blocked) return res.status(422).json({ error: safeValues.message, code: safeValues.code });
 

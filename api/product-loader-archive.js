@@ -3,6 +3,8 @@ import { requireAdminKey } from './_admin-auth.js';
 import { logProductLoaderAudit } from './_product-loader-audit.js';
 import { NUTSTORE_ARCHIVED_BY } from './nutstore-process.js';
 import { normalizeUnitsOfIssue } from '../lib/selling-unit.mjs';
+import { customerPriceFromPositill } from '../lib/catalogue-price.mjs';
+import { fetchStmastRow, sqlRowToPreview } from './_sql-stmast.js';
 
 const ARCHIVE_DEFAULT_CATEGORY = 'Uncategorised';
 const ARCHIVE_DEFAULT_SUB = 'General';
@@ -44,12 +46,29 @@ export default async function handler(req, res) {
   const now = new Date().toISOString();
   const title = String(body.title || '').trim() || String(body.displayCode || '').trim() || sku;
   const imageColumn = slotColumn(body.imageSlot);
+  let archivePrice = Number(body.price) || 0;
+  if (body.sqlRow) {
+    const positillCode = String(body.sqlRow.code || body.barcode || sku).trim().toUpperCase();
+    try {
+      const raw = await fetchStmastRow(positillCode);
+      if (!raw || String(raw.CODE || raw.code || '').trim().toUpperCase() !== positillCode) {
+        throw new Error('Exact Positill code was not returned');
+      }
+      archivePrice = customerPriceFromPositill(sqlRowToPreview(raw).price);
+      if (archivePrice <= 0) throw new Error('Live Positill price is invalid');
+    } catch {
+      return res.status(503).json({
+        error: 'Archiving paused because the live Positill price could not be verified.',
+        code: 'live_price_unavailable',
+      });
+    }
+  }
   const payload = {
     sku,
     barcode: String(body.barcode || sku).trim(),
     title,
     original_description: String(body.description || '').trim() || title,
-    price: Number(body.price ?? body.sqlRow?.price ?? 0) || 0,
+    price: archivePrice,
     units_of_issue: normalizeUnitsOfIssue(body.unitsOfIssue || 'EACH'),
     pack_description: String(body.packDescription || '').trim(),
     category: String(body.category || '').trim() || ARCHIVE_DEFAULT_CATEGORY,

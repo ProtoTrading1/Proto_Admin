@@ -153,7 +153,8 @@ export default async function handler(req, res) {
     dataSource: null,
     bridgeAttempted: true,
   }));
-  if (!requireNew && !existing && resolvedPositill.dataSource !== 'erp_sql') {
+  if (((!requireNew && !existing) || (requireNew && canonicalProduct))
+      && resolvedPositill.dataSource !== 'erp_sql') {
     return res.status(503).json({
       error: 'Publishing paused because the live Positill price could not be verified. Retry when Live Positill SQL is connected.',
       code: 'live_price_unavailable',
@@ -172,7 +173,11 @@ export default async function handler(req, res) {
       availableStock,
       erpPriceExVat: sqlRow?.price,
     },
-    priceBasis: requireNew ? 'vat_inclusive' : 'erp_ex_vat',
+    // Manually authored products with no Positill match use the entered
+    // inclusive price. Every Positill-backed upload converts live PRICE_A.
+    priceBasis: requireNew && !canonicalProduct && resolvedPositill.dataSource !== 'erp_sql'
+      ? 'vat_inclusive'
+      : 'erp_ex_vat',
   });
   if (safeValues.blocked) {
     return res.status(422).json({

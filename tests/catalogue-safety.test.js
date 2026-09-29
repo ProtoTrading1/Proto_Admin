@@ -84,4 +84,36 @@ describe('catalogue safety checks', () => {
       availableStock: 7,
     });
   });
+
+  it('publishes every GERMOL variant at the VAT-inclusive live Positill price', () => {
+    for (const sku of ['GERMOL-2G', 'GERMOL-3LEMON', 'GERMOL-4MENTHOL', 'GERMOL-5ALOE']) {
+      expect(canonicalPublishValues({
+        product: { sku, sell_price: 11.5, stock_qty: 372 },
+        existing: { sku, price: 10 },
+        livePositill: { price: 10, onhand: 372, available: 372 },
+        positillSource: 'erp_sql',
+        submitted: { price: 10 },
+        priceBasis: 'erp_ex_vat',
+      })).toMatchObject({
+        blocked: false,
+        price: 11.5,
+        priceSource: 'positill.live_price_a_ex_vat_converted',
+        corrections: ['price_mismatch'],
+      });
+    }
+  });
+
+  it('converts an existing Positill-backed new product but leaves manual inclusive prices alone', () => {
+    expect(canonicalPublishValues({
+      product: { sell_price: 11.5 },
+      livePositill: { price: 10 },
+      positillSource: 'erp_sql',
+      submitted: { price: 10 },
+      priceBasis: 'erp_ex_vat',
+    })).toMatchObject({ price: 11.5, priceSource: 'positill.live_price_a_ex_vat_converted' });
+    expect(canonicalPublishValues({
+      submitted: { price: 11.5 },
+      priceBasis: 'vat_inclusive',
+    })).toMatchObject({ price: 11.5 });
+  });
 });

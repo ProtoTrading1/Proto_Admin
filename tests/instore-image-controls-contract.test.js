@@ -41,7 +41,8 @@ describe('Instore image-only archive contract', () => {
     expect(panel).toContain('Hide a wrong photo without archiving the product');
     expect(panel).toContain('Product, price and stock are unchanged.');
     expect(panel).toContain("action === 'hide'");
-    expect(panel).toContain("action === 'restore'");
+    expect(panel).toContain("change('restore')");
+    expect(panel).toContain('Restore original image');
     expect(panel).toContain('Hide from Instore Products');
     expect(panel).toContain('Restore to Instore Products');
   });
