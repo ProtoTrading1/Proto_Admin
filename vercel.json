@@ -100,6 +100,9 @@
     "api/product-loader-dormant.js": {
       "maxDuration": 60
     },
+    "api/product-loader-batch-lookup.js": {
+      "maxDuration": 300
+    },
     "api/image-processing-jobs.js": {
       "maxDuration": 60
     },

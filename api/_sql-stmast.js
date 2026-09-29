@@ -24,7 +24,7 @@ export function stmastSetupMessage() {
 }
 
 const STMAST_QUERY = `
-  SELECT TOP 1 CODE, DESCR, PRICE_A, ONHAND, BOOKED, DEPT
+  SELECT TOP 1 CODE, DESCR, UNITS, PRICE_A, ONHAND, BOOKED, DEPT
   FROM dbo.STMAST
   WHERE CODE = @code
 `;
@@ -36,6 +36,9 @@ function normalizeRow(row) {
   const normalized = {
     CODE: row.CODE ?? row.code,
     DESCR: row.DESCR ?? row.descr ?? row.title ?? row.description,
+    // Positill's selling unit is commonly returned as UNITS. Keep the
+    // documented bridge aliases for older read-only bridge payloads.
+    UNITS: row.UNITS ?? row.units ?? row.units_of_issue ?? row.unit_of_issue ?? row.unit,
     PRICE_A: row.PRICE_A ?? row.price_a ?? row.price,
     ONHAND: row.ONHAND ?? row.onhand,
     BOOKED: row.BOOKED ?? row.booked,
@@ -51,10 +54,12 @@ export function toSqlPreview(row) {
     return {
       code: String(row.code || row.CODE || '').trim(),
       title: String(row.title ?? '').trim(),
+      units_of_issue: String(row.UNITS ?? row.units ?? row.units_of_issue ?? row.unit_of_issue ?? row.unit ?? '').trim(),
       price: Number(row.price ?? row.PRICE_A ?? row.price_a) || 0,
       onhand: Number(row.onhand ?? row.ONHAND) || 0,
       booked: Number(row.booked ?? row.BOOKED) || 0,
       available: Number(row.available ?? ((Number(row.onhand ?? row.ONHAND) || 0) - (Number(row.booked ?? row.BOOKED) || 0))),
+      stock_fields_verified: row.stock_fields_verified === false ? false : (row.onhand ?? row.ONHAND) != null && (row.booked ?? row.BOOKED) != null,
       dept: String(row.dept ?? row.DEPT ?? '').trim(),
     };
   }
@@ -122,10 +127,12 @@ export function sqlRowToPreview(sqlRow) {
   return {
     code: String(sqlRow.CODE || '').trim(),
     title: String(sqlRow.DESCR || '').trim(),
+    units_of_issue: String(sqlRow.UNITS ?? '').trim(),
     price: Number(sqlRow.PRICE_A) || 0,
     onhand,
     booked,
     available: onhand - booked,
+    stock_fields_verified: sqlRow.ONHAND != null && sqlRow.BOOKED != null,
     dept: String(sqlRow.DEPT || '').trim(),
   };
 }

@@ -3,13 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   lookupWebsiteStockExact,
   resolveProductLoaderMatch,
+  fetchDormantSkuSetForCodes,
 } = vi.hoisted(() => ({
   lookupWebsiteStockExact: vi.fn(),
   resolveProductLoaderMatch: vi.fn(),
+  fetchDormantSkuSetForCodes: vi.fn(async () => new Set()),
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({}),
+  createClient: () => ({ from: () => ({ select: () => ({ in: async () => ({ data: [], error: null }) }) }) }),
 }));
 
 vi.mock('../api/_admin-auth.js', () => ({
@@ -24,7 +26,7 @@ vi.mock('../api/_product-loader-lookup.js', async () => {
   const { parseLoaderFilename } = await vi.importActual('../api/_product-loader-filename.js');
   return {
     classifyBatchItem: (item) => (item.canPublish ? 'ready' : 'not_found'),
-    fetchDormantSkuSet: vi.fn(async () => new Set()),
+    fetchDormantSkuSetForCodes,
     lookupWebsiteStockExact,
     parseLoaderFilename,
     resolveProductLoaderMatch,
@@ -54,6 +56,7 @@ function responseRecorder() {
 
 describe('Product Loader colour variant batch lookup', () => {
   beforeEach(() => {
+    fetchDormantSkuSetForCodes.mockReset().mockResolvedValue(new Set());
     lookupWebsiteStockExact.mockReset().mockResolvedValue(null);
     resolveProductLoaderMatch.mockReset().mockImplementation(async (_sb, request) => ({
       code: request.code,
@@ -80,6 +83,60 @@ describe('Product Loader colour variant batch lookup', () => {
       websiteStatus: 'new',
       needsReview: false,
     }));
+  });
+
+  it('checks archive status only for selected parent and full SKUs', async () => {
+    const res = responseRecorder();
+    await handler({ method: 'POST', body: { filenames: ['8630330015-PNK.jpg', '8630330015-PNK (2).jpg'] } }, res);
+    expect(fetchDormantSkuSetForCodes).toHaveBeenCalledOnce();
+    expect(fetchDormantSkuSetForCodes.mock.calls[0][1]).toEqual([
+      '8630330015', '8630330015-PNK',
+      '8630330015', '8630330015-PNK',
+    ]);
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('blocks the whole lookup if archive verification fails', async () => {
+    fetchDormantSkuSetForCodes.mockRejectedValueOnce(new Error('archive unavailable'));
+    const res = responseRecorder();
+    await handler({ method: 'POST', body: { filenames: ['8630330015-PNK.jpg'] } }, res);
+    expect(res.statusCode).toBe(503);
+    expect(resolveProductLoaderMatch).not.toHaveBeenCalled();
+  });
+
+  it('limits simultaneous SKU lookups and preserves file order in a folder', async () => {
+    let active = 0;
+    let peak = 0;
+    resolveProductLoaderMatch.mockImplementation(async (_sb, request) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return { code: request.code, canPublish: true, warnings: [], imageSlot: 1 };
+    });
+    const filenames = Array.from({ length: 12 }, (_, index) => `8620200${String(index).padStart(3, '0')}.jpg`);
+    const res = responseRecorder();
+    await handler({ method: 'POST', body: { filenames, groupColourVariants: false } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(peak).toBe(4);
+    expect(res.body.items.map((item) => item.filename)).toEqual(filenames);
+  });
+
+  it('uses one ten-digit Positill SKU for landed image suffixes and never creates copy SKUs', async () => {
+    const res = responseRecorder();
+    await handler({ method: 'POST', body: {
+      filenames: ['8626000775-1.jpg', '8626000775 (2).jpg', '8626000775.2.jpg'],
+      groupColourVariants: false,
+      strictExact: true,
+    } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(resolveProductLoaderMatch.mock.calls.map(([, request]) => [request.code, request.fullCode, request.imageSlot])).toEqual([
+      ['8626000775', '8626000775', 1],
+      ['8626000775', '8626000775', 1],
+      ['8626000775', '8626000775', 2],
+    ]);
+    expect(res.body.items.map(({ code }) => code)).toEqual(['8626000775', '8626000775', '8626000775']);
+    expect(fetchDormantSkuSetForCodes.mock.calls[0][1]).toEqual(['8626000775', '8626000775', '8626000775']);
   });
 
   it('keeps a copied colour image on the same website SKU and assigns slot 2', async () => {

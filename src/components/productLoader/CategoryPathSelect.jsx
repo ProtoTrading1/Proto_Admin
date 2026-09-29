@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react';
 import { subcategoryOptionsFromTree } from '../../lib/taxonomyAdmin';
 
 function childrenOf(tree, id) {
@@ -9,6 +10,23 @@ function childrenOf(tree, id) {
     if (node.children?.length) stack.push(...node.children);
   }
   return [];
+}
+
+// Discard stale descendants when the category branch changes.
+export function normalizeCategoryPathValue(tree = [], value = []) {
+  const requested = Array.isArray(value) ? value.filter(Boolean) : [];
+  if (!requested.length) return [];
+  const main = (tree || []).find((node) => node.id === requested[0]);
+  if (!main) return [];
+  const normalized = [main.id];
+  let children = main.children || [];
+  for (const id of requested.slice(1)) {
+    const child = children.find((node) => node.id === id);
+    if (!child) break;
+    normalized.push(child.id);
+    children = child.children || [];
+  }
+  return normalized;
 }
 
 /**
@@ -27,8 +45,17 @@ export default function CategoryPathSelect({
   mainLabel = 'Default category',
   mainPlaceholder = '— Select if needed —',
 }) {
-  const mainId = value[0] || '';
-  const childIds = value.slice(1);
+  const normalizedValue = useMemo(
+    () => normalizeCategoryPathValue(taxonomyTree, value),
+    [taxonomyTree, value],
+  );
+  const normalizedKey = normalizedValue.join('\u0000');
+  const valueKey = (Array.isArray(value) ? value : []).filter(Boolean).join('\u0000');
+  useEffect(() => {
+    if (normalizedKey !== valueKey) onChange?.(normalizedValue);
+  }, [normalizedKey, valueKey, normalizedValue, onChange]);
+  const mainId = normalizedValue[0] || '';
+  const childIds = normalizedValue.slice(1);
 
   // Render one picker per level while the previous level has a value and there
   // are options — stops one level past the deepest populated selection.

@@ -6,12 +6,14 @@ const OrderAnalyticsDashboard = lazyRetry(() => import('./OrderAnalyticsDashboar
 const SearchAnalyticsDashboard = lazyRetry(() => import('./SearchAnalyticsDashboard'));
 const AbandonedBasketsPanel = lazyRetry(() => import('./AbandonedBasketsPanel'));
 const EngagementPanel = lazyRetry(() => import('./EngagementPanel'));
+const InstoreAnalyticsDashboard = lazyRetry(() => import('./InstoreAnalyticsDashboard'));
 
 const VIEWS = [
   { key: 'orders', label: 'Order Analytics', Component: OrderAnalyticsDashboard },
   { key: 'search', label: 'Search Analytics', Component: SearchAnalyticsDashboard },
   { key: 'baskets', label: 'Abandoned Baskets', Component: AbandonedBasketsPanel },
   { key: 'engagement', label: 'Engagement', Component: EngagementPanel },
+  { key: 'instore', label: 'Instore', Component: InstoreAnalyticsDashboard },
 ];
 
 export default function AnalyticsHub() {

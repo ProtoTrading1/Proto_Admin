@@ -1,13 +1,60 @@
 import { readApiJson } from './apiError.js';
 import { catalogueDisplayTitle, catalogueDescription } from './productLoaderDisplay.js';
 import { parseIntakeFilename, siblingSkuForCopy } from './parseIntakeFilename';
+import { compressImage } from './products';
 
-export async function lookupFilenames(filenames, files, { groupColourVariants = true } = {}) {
-  const res = await fetch('/api/product-loader-batch-lookup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filenames, groupColourVariants }),
-  });
+// Vercel rejects a request before the function runs when the JSON body grows
+// beyond its platform limit. Base64 adds roughly one third to the source file,
+// so keep landed-shipment images comfortably below that boundary. Small files
+// retain their original bytes; larger camera images use the same 800px white-
+// canvas JPEG preparation already used by Product Manager uploads.
+export const INSTORE_INLINE_IMAGE_MAX_BYTES = 1_500_000;
+
+function jpegUploadFilename(filename) {
+  const name = String(filename || 'product').trim() || 'product';
+  return `${name.replace(/\.[^.]+$/, '')}.jpg`;
+}
+
+export async function prepareLocalShipmentImage(file, { compress = compressImage } = {}) {
+  const size = Number(file?.size);
+  if (!file || !Number.isFinite(size) || size < 1) throw new Error('The selected product image is empty');
+  if (size <= INSTORE_INLINE_IMAGE_MAX_BYTES) {
+    return {
+      file,
+      filename: String(file.name || 'product.jpg'),
+      contentType: String(file.type || 'image/jpeg'),
+      compressed: false,
+    };
+  }
+
+  const prepared = await compress(file);
+  const preparedSize = Number(prepared?.size);
+  if (!prepared || !Number.isFinite(preparedSize) || preparedSize < 1 || preparedSize > INSTORE_INLINE_IMAGE_MAX_BYTES) {
+    throw new Error('This image is too large to send safely. Resize it below 1.5 MB and try again.');
+  }
+  return {
+    file: prepared,
+    filename: jpegUploadFilename(file.name),
+    contentType: 'image/jpeg',
+    compressed: true,
+  };
+}
+
+export async function lookupFilenames(filenames, files, { groupColourVariants = true, strictExact = false } = {}) {
+  let res;
+  try {
+    res = await fetch('/api/product-loader-batch-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames, groupColourVariants, strictExact }),
+      signal: AbortSignal.timeout(240_000),
+    });
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      throw new Error('Live product lookup timed out. Nothing was imported; retry the lookup or use a smaller folder.');
+    }
+    throw error;
+  }
   const json = await readApiJson(res, { fallback: 'Lookup failed' });
   const fileByName = new Map(files.map((f) => [f.name, f]));
   return (json.items || []).map((item) => {
@@ -21,7 +68,7 @@ export async function lookupFilenames(filenames, files, { groupColourVariants = 
       file,
       group,
       copyIndex,
-      publishSku: item.isColourVariant
+      publishSku: strictExact || item.isColourVariant
         ? item.code
         : siblingSkuForCopy(item.code, copyIndex),
       status: group === 'not_found'
@@ -53,13 +100,111 @@ export async function fetchPublishHistory({ sku = '', q = '', action = '', limit
   return json;
 }
 
-function fileToBase64(file) {
+export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || '').split(',')[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Only a positive acknowledgement for this exact requested SKU is a completed
+ * import. A successful HTTP response alone may be an empty/proxy response.
+ * Duplicates are explicit skips, never manufactured additions.
+ */
+export function parseLocalShipmentInstoreResult(json, expectedSku) {
+  const sku = String(expectedSku || '').trim().toUpperCase();
+  if (!sku || !Array.isArray(json?.results) || json.results.length !== 1) {
+    throw new Error('Instore did not confirm an outcome for this item. Refresh its status before retrying.');
+  }
+  const result = json.results[0];
+  if (!result || String(result.sku || '').trim().toUpperCase() !== sku) {
+    throw new Error('Instore returned a different SKU. No addition has been confirmed for this item.');
+  }
+  if (result.ok !== true) throw new Error(result.error || 'Could not add item to Instore');
+  if (result.action === 'instore_import' && result.skipped !== true) {
+    return { ...result, sku, outcome: 'added' };
+  }
+  if (result.action === 'instore_skipped' && result.skipped === true
+    && ['already_on_main_site', 'already_in_instore'].includes(result.reason)) {
+    return { ...result, sku, outcome: 'skipped' };
+  }
+  throw new Error('Instore did not confirm the requested import. Refresh its status before retrying.');
+}
+
+/**
+ * Add one exact Positill match from a locally selected landed-shipment folder
+ * to Instore only. The server rechecks the SKU, price and description before
+ * it accepts the image or confirmed received-piece quantity.
+ */
+export async function importLocalShipmentToInstore(item, { category, categoryPath, receiptLines, stockMode = 'received' }) {
+  if (!item?.file || !item?.code) throw new Error('Missing local image or exact Positill code');
+  const preparedImage = await prepareLocalShipmentImage(item.file);
+  const imageBase64 = await fileToBase64(preparedImage.file);
+  const res = await fetch('/api/nutstore-process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: stockMode === 'positill_live' ? 'instore_live' : 'instore',
+      ...(stockMode === 'received' ? { receiptLines } : {}),
+      items: [{
+        code: item.code,
+        filename: preparedImage.filename || item.filename,
+        path: item.sourcePath || item.file.webkitRelativePath || item.filename,
+        contentType: preparedImage.contentType,
+        imageBase64,
+        category,
+        categoryPath,
+        ...(stockMode === 'received' ? { receiptLines } : {}),
+        // A department invoice is a Positill export. It may supply the
+        // canonical selling unit only when the live STMAST bridge is pending
+        // its update. Supplier-invoice PCS values are never used as units;
+        // explicit admin confirmations are independently validated on the
+        // server and are never represented as Positill-sourced units.
+        verifiedSellingUnit: item.sellingUnitSource === 'positill_department_invoice' ? item.unitsOfIssue : '',
+        verifiedSellingUnitSource: item.sellingUnitSource === 'positill_department_invoice' ? 'positill_department_invoice' : '',
+        adminConfirmedSellingUnit: String(item.sellingUnitSource || '').startsWith('admin_confirmed_') ? 'EACH' : '',
+        adminConfirmedSellingUnitSource: ['admin_confirmed_gift_bag_each', 'admin_confirmed_batch_each'].includes(item.sellingUnitSource) ? item.sellingUnitSource : '',
+      }],
+    }),
+  });
+  const json = await readApiJson(res, { fallback: 'Could not add item to Instore' });
+  return parseLocalShipmentInstoreResult(json, item.code);
+}
+
+/** Correct the approved received-stock override for an existing landed item.
+ * The server only permits records previously created by this landed-folder
+ * workflow; it never creates products or changes images, price or category. */
+export async function correctLocalShipmentInstoreQuantity(item, { receiptLines }) {
+  if (!item?.code) throw new Error('Missing exact Positill code');
+  const res = await fetch('/api/nutstore-process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'instore_correct_received',
+      items: [{ code: item.code, receiptLines }],
+    }),
+  });
+  const json = await readApiJson(res, { fallback: 'Could not correct the received quantity' });
+  const result = json?.results?.[0];
+  if (!Array.isArray(json?.results) || json.results.length !== 1 || result?.ok !== true
+    || String(result.sku || '').trim().toUpperCase() !== String(item.code).trim().toUpperCase()
+    || result.action !== 'received_quantity_corrected') {
+    throw new Error(result?.error || 'Instore did not confirm the requested quantity correction. Refresh its status before retrying.');
+  }
+  return result;
+}
+
+/** Replaces approved landed-stock overrides after Positill exposes the GRV stock. */
+export async function reconcileInstoreLandedStock() {
+  const res = await fetch('/api/nutstore-process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'instore_reconcile' }),
+  });
+  return readApiJson(res, { fallback: 'Could not reconcile landed Instore stock with Positill.' });
 }
 
 /** Upload one image file to a product's slot (1-4). Returns { url }. */

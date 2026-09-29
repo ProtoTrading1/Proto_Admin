@@ -4,12 +4,13 @@ import { looksLikeExVatPrice } from '../lib/catalogue-price.mjs';
 import { isSqlConfigured } from './_sql-provider.js';
 import {
   classifyBatchItem,
-  fetchDormantSkuSet,
+  fetchDormantSkuSetForCodes,
   lookupWebsiteStockExact,
   parseLoaderFilename,
   resolveProductLoaderMatch,
 } from './_product-loader-lookup.js';
-import { siblingSkuForCopy } from './_product-loader-filename.js';
+import { landedPositillSku, siblingSkuForCopy } from './_product-loader-filename.js';
+import { mainSiteInstoreCodeSet, normalizeInstoreSku } from '../lib/instore-duplicate-guard.mjs';
 import {
   assignColourVariantImageSlots,
   parseColourVariantFilename,
@@ -23,22 +24,27 @@ function getStockClient() {
   );
 }
 
+async function lookupRowsInChunks(sb, table, columns, field, values) {
+  const rows = [];
+  for (let from = 0; from < values.length; from += 100) {
+    const { data, error } = await sb.from(table).select(columns).in(field, values.slice(from, from + 100));
+    if (error) return { data: [], error };
+    rows.push(...(data || []));
+  }
+  return { data: rows, error: null };
+}
+
 export default async function handler(req, res) {
   if (!(await requireOwner(req, res))) return;
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { filenames, groupColourVariants = true } = req.body || {};
+  const { filenames, groupColourVariants = true, strictExact = false } = req.body || {};
   if (!Array.isArray(filenames) || !filenames.length) {
     return res.status(400).json({ error: 'filenames array is required' });
   }
 
   const sb = getStockClient();
-  const dormantSkus = await fetchDormantSkuSet(sb).catch(() => new Set());
-  const items = [];
-  let matched = 0;
-  const groups = { ready: 0, needs_review: 0, not_found: 0 };
-
   const parsedRows = assignColourVariantImageSlots(
     filenames.map((filename) => ({
       filename,
@@ -47,10 +53,21 @@ export default async function handler(req, res) {
     })),
   );
 
-  for (const parsedRow of parsedRows) {
+  let dormantSkus;
+  try {
+    dormantSkus = await fetchDormantSkuSetForCodes(sb, parsedRows.flatMap(({ parsed, colourVariant }) =>
+      strictExact ? [landedPositillSku(parsed)] : [colourVariant?.positillCode || parsed.code, parsed.fullCode]));
+  } catch {
+    return res.status(503).json({ error: 'Archived product verification failed. No products were cleared for import; retry the lookup.' });
+  }
+  // Shared promises ensure multiple images of a SKU use the same live source
+  // results. Keep only a few distinct Positill lookups in flight at once.
+  const lookupCache = new Map();
+
+  const processRow = async (parsedRow) => {
     const { filename, parsed, colourVariant, assignedImageSlot, tooManyVariantImages } = parsedRow;
     if (parsed.parseError || !parsed.code) {
-      items.push({
+      return {
         filename,
         code: '',
         title: '',
@@ -60,13 +77,11 @@ export default async function handler(req, res) {
         parseError: parsed.parseError,
         websiteStatus: 'not_found',
         group: 'not_found',
-      });
-      groups.not_found += 1;
-      continue;
+      };
     }
 
     if (tooManyVariantImages) {
-      items.push({
+      return {
         filename,
         code: colourVariant.variantSku,
         displayCode: colourVariant.variantSku,
@@ -83,21 +98,21 @@ export default async function handler(req, res) {
         websiteStatus: 'not_found',
         group: 'not_found',
         canPublish: false,
-      });
-      groups.not_found += 1;
-      continue;
+      };
     }
 
     // Recognised colour suffixes are website variants, not Positill SKUs.
     // Resolve the base code first, then inspect the exact synthetic website SKU
     // so the colour keeps its own image gallery while inheriting ERP data.
-    const lookupCode = colourVariant?.positillCode || parsed.code;
+    const lookupCode = strictExact ? landedPositillSku(parsed) : colourVariant?.positillCode || parsed.code;
     const match = await resolveProductLoaderMatch(sb, {
       code: lookupCode,
-      fullCode: colourVariant ? lookupCode : parsed.fullCode,
-      displayCode: colourVariant ? lookupCode : parsed.displayCode,
+      fullCode: strictExact || colourVariant ? lookupCode : parsed.fullCode,
+      displayCode: strictExact || colourVariant ? lookupCode : parsed.displayCode,
       imageSlot: colourVariant ? assignedImageSlot : parsed.imageSlot,
       dormantSkus,
+      strictExact: Boolean(strictExact),
+      lookupCache: strictExact ? lookupCache : null,
     });
 
     let item = { filename, ...match };
@@ -170,7 +185,7 @@ export default async function handler(req, res) {
     // PARENT (so it picks up the title/description/category/barcode) but
     // publishes to its own sibling record (CODE-2, CODE-3…) so it never
     // overwrites the parent's image.
-    if (!colourVariant && parsed.copyIndex > 1 && (match.websiteRow || match.sqlRow)) {
+    if (!strictExact && !colourVariant && parsed.copyIndex > 1 && (match.websiteRow || match.sqlRow)) {
       const siblingSku = siblingSkuForCopy(match.code, parsed.copyIndex);
       const warnings = (match.warnings || []).filter((w) => w !== 'image_exists');
       item = {
@@ -187,11 +202,53 @@ export default async function handler(req, res) {
       };
     }
 
-    if (item.canPublish) matched += 1;
-    const group = classifyBatchItem(item);
-    groups[group] += 1;
+    // A landed shipment receives physical pieces. Without a verified selling
+    // unit a pack SKU cannot safely be converted to sellable stock, so fail
+    // closed rather than suggesting EACH for the operator to second-guess.
+    if (strictExact && !item.canonicalSellingUnitKnown) {
+      const warnings = [...(item.warnings || []), 'selling_unit_required'];
+      item = { ...item, warnings, needsReview: true };
+    }
 
-    items.push({ ...item, group });
+    const group = classifyBatchItem(item);
+    return { ...item, group };
+  };
+  const items = [];
+  for (let from = 0; from < parsedRows.length; from += 4) {
+    items.push(...await Promise.all(parsedRows.slice(from, from + 4).map(processRow)));
+  }
+  const matched = items.filter((item) => item.canPublish).length;
+  const groups = { ready: 0, needs_review: 0, not_found: 0 };
+  for (const item of items) groups[item.group || 'not_found'] += 1;
+
+  // Preflight existing Instore items so the review table blocks them before an
+  // operator can select them. The write endpoint repeats the check for races.
+  const itemSkus = [...new Set(items.map((item) => normalizeInstoreSku(item.code)).filter(Boolean))];
+  let existingMainSiteCodes = new Set();
+  let existingMainSiteLookupFailed = false;
+  if (strictExact && itemSkus.length) {
+    const [bySku, byBarcode] = await Promise.all([
+      lookupRowsInChunks(sb, 'website_stock', 'sku, barcode', 'sku', itemSkus),
+      lookupRowsInChunks(sb, 'website_stock', 'sku, barcode', 'barcode', itemSkus),
+    ]);
+    if (bySku.error || byBarcode.error) existingMainSiteLookupFailed = true;
+    else {
+      existingMainSiteCodes = mainSiteInstoreCodeSet([...(bySku.data || []), ...(byBarcode.data || [])]);
+    }
+  }
+
+  let existingInstoreSkus = new Set();
+  let existingInstoreLookupFailed = false;
+  if (strictExact && itemSkus.length) {
+    const { data, error } = await lookupRowsInChunks(sb, 'extended_range_items', 'sku', 'sku', itemSkus);
+    if (error) existingInstoreLookupFailed = true;
+    else existingInstoreSkus = new Set((data || []).map((row) => normalizeInstoreSku(row.sku)));
+  }
+  for (const item of items) {
+    item.existingOnMainSite = existingMainSiteCodes.has(normalizeInstoreSku(item.code));
+    item.existingMainSiteLookupFailed = existingMainSiteLookupFailed;
+    item.existingInstore = existingInstoreSkus.has(normalizeInstoreSku(item.code));
+    item.existingInstoreLookupFailed = existingInstoreLookupFailed;
   }
 
   const colourVariantSkus = new Set(items.filter((item) => item.isColourVariant).map((item) => item.code));

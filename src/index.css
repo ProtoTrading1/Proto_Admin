@@ -1444,6 +1444,22 @@ input, select, textarea { font-family: inherit; outline: none; }
 }
 
 .adm-order-row:hover { background: #f8fafc; }
+.adm-order-expand-cell { display: flex; justify-content: flex-end; }
+.adm-order-expand-btn {
+  border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;
+  color: #0f172a; font: inherit; font-size: 12px; font-weight: 800;
+  padding: 8px 9px; min-height: 36px; cursor: pointer; white-space: nowrap;
+}
+.adm-order-expand-btn:hover { background: #f1f5f9; }
+.adm-order-expand-btn:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.adm-order-expand-btn span { margin-left: 3px; }
+.adm-order-detail { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px; }
+.adm-order-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.adm-order-detail-head h3 { margin: 0 0 3px; font-size: 17px; color: #0f172a; }
+.adm-order-detail-head p { margin: 0; font-size: 12px; color: #475569; }
+.adm-order-detail-head strong { font-size: 16px; white-space: nowrap; color: #0f172a; }
+.adm-order-detail-head strong span { font-size: 11px; font-weight: 600; color: #64748b; }
+.adm-order-load-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; padding: 12px 14px; border: 1px solid #fca5a5; border-radius: 10px; background: #fef2f2; color: #991b1b; font-size: 13px; }
 
 .adm-main {
   display: grid;
@@ -6417,12 +6433,44 @@ html, body { background: #f5f5f5; color: #111827; }
 .oa-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .oa-table th, .oa-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #f1f5f9; }
 .oa-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
-.oa-hub { display: grid; gap: 16px; align-content: start; }
-.oa-hub-tabs { margin-bottom: 0; }
+.oa-hub { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+.oa-hub-tabs { min-width: 0; margin-bottom: 0; }
 /* Holds the page height steady while a tab's chunk and data load, so the
    tab strip stays put instead of the content collapsing underneath it. */
 .oa-hub-view { min-height: 70vh; }
 .oa-loading--reserved { align-items: center; min-height: 60vh; gap: 10px; }
+
+/* Instore analytics: evidence first, with legacy traffic tracking clearly set aside. */
+.ia-heading h2 { margin: 0; color: #0f172a; font-size: 22px; line-height: 1.2; }
+.ia-heading p { margin: 5px 0 0; color: #475569; font-size: 14px; }
+.ia-status { display: flex; gap: 10px; align-items: flex-start; padding: 13px 15px; background: #fffbeb; color: #78350f; border: 1px solid #fcd34d; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+.ia-status svg { flex: none; margin-top: 1px; }
+.ia-meta { margin: 0; color: #475569; font-size: 13px; line-height: 1.5; }
+.ia-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ia-stat-grid .oa-stat-label { color: #475569; }
+.ia-stat-grid p { margin: 8px 0 0; color: #475569; font-size: 12px; line-height: 1.4; }
+.ia-section-note { margin: 4px 0 0; color: #475569; font-size: 12px; line-height: 1.4; }
+.ia-chart-scroll { overflow-x: auto; padding-bottom: 5px; }
+.ia-bars { display: flex; align-items: flex-end; gap: 7px; height: 190px; min-width: 580px; border-bottom: 1px solid #cbd5e1; }
+.ia-bar-slot { display: flex; flex: 1; min-width: 13px; height: 100%; flex-direction: column; align-items: center; justify-content: flex-end; outline-offset: 3px; }
+.ia-bar-count { color: #334155; font-size: 10px; min-height: 14px; }
+.ia-bar { display: block; width: min(100%, 32px); background: #16803d; border-radius: 4px 4px 0 0; }
+.ia-bar-label { color: #475569; font-size: 10px; white-space: nowrap; padding-top: 5px; min-height: 19px; }
+.ia-sort { display: flex; align-items: center; gap: 7px; color: #334155; font-size: 12px; font-weight: 700; }
+.ia-sort select { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #0f172a; font: inherit; }
+.ia-code { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ia-show-all { margin-top: 12px; padding: 8px 0; border: 0; background: none; color: #166534; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ia-method { padding: 12px 15px; border: 1px solid #e2e8f0; border-radius: 9px; color: #475569; font-size: 13px; line-height: 1.5; }
+.ia-method summary { color: #0f172a; font-weight: 700; cursor: pointer; }
+.ia-method p { max-width: 85ch; }
+.ia-dashboard :is(button, select, summary, .ia-bar-slot):focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .adm-customer-tabs.oa-hub-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oa-hub-view, .ia-dashboard { min-width: 0; }
+  .ia-dashboard { grid-template-columns: minmax(0, 1fr); }
+  .ia-status span, .ia-meta { overflow-wrap: anywhere; }
+}
 
 /* --- Abandoned Baskets ------------------------------------------------- */
 /* Type, cards and badges come from the shared analytics + admin scales
@@ -6565,8 +6613,13 @@ html, body { background: #f5f5f5; color: #111827; }
 .sa-empty-banner__meta { font-size: 12px; color: #92400e; margin: 0; }
 @media (max-width: 900px) {
   .oa-stat-grid, .oa-split, .oa-peak-grid, .oa-insights-row { grid-template-columns: 1fr; }
+  .ia-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sa-stat-grid--5 { grid-template-columns: 1fr 1fr; }
   .sa-stat-grid--4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .ia-stat-grid { grid-template-columns: 1fr; }
+  .ia-heading h2 { font-size: 19px; }
 }
 
 .oa-wa-notify {
@@ -7453,6 +7506,37 @@ html, body { background: #f5f5f5; color: #111827; }
 }
 .pl-folder-table thead th { background: #f8fafc; position: sticky; top: 0; }
 .pl-folder-thumb { width: 40px; height: 40px; object-fit: contain; border-radius: 4px; background: #f8fafc; }
+
+/* Shared shipment setup; the review cards have their own scoped stylesheet. */
+.pl-section--instore .pl-section-note--instore { margin-bottom: 10px; max-width: 760px; }
+.pl-section--instore .pl-action-row { margin-top: 8px; }
+.pl-instore-summary {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  padding: 9px 12px; margin: 10px 0; border: 1px solid #dbe4f0;
+  border-radius: 8px; background: #f8fafc; font-size: 12px; color: #64748b;
+}
+.pl-instore-summary strong { color: #14213d; font-size: 14px; }
+.pl-stock-source-choice {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  flex-basis: 100%; margin: 10px 0; padding: 10px 12px;
+  border: 1px solid #dbe4f0; border-radius: 8px; min-width: 0;
+}
+.pl-stock-source-choice legend { padding: 0 4px; font-size: 12px; font-weight: 700; color: #14213d; }
+.pl-stock-source-choice .adm-muted { flex-basis: 100%; }
+.pl-stock-source-choice label { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.pl-instore-import-blocker { color: #9a3412; font-size: 13px; line-height: 1.4; }
+.pl-shared-family-photo {
+  margin: 12px 0; padding: 12px; border: 1px solid #dbe4f0;
+  border-radius: 8px; background: #f8fafc;
+}
+.pl-shared-family-photo summary { cursor: pointer; font-weight: 700; color: #14213d; }
+.pl-shared-family-photo p, .pl-shared-family-photo small { display: block; color: #475569; line-height: 1.45; }
+.pl-shared-family-photo label { display: block; margin: 10px 0; font-size: 13px; font-weight: 600; }
+.pl-shared-family-photo select, .pl-shared-family-photo input {
+  display: block; width: 100%; max-width: 550px; min-height: 40px;
+  margin-top: 5px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;
+}
+.pl-shared-family-photo button { min-height: 40px; }
 
 /* Owner-only Image Processing Centre */
 .ipc-instore-image-control {
@@ -10546,6 +10630,11 @@ html, body { max-width: 100%; overflow-x: hidden; }
      the status cell holds controls, so it must not be squeezed to one line. */
   .adm-order-row > [data-label="Status"] { display: block; text-align: left; }
   .adm-order-row > [data-label="Status"]::before { display: block; margin-bottom: 6px; }
+  .adm-order-row > .adm-order-expand-cell { justify-content: stretch; padding: 8px 12px; }
+  .adm-order-expand-btn { width: 100%; min-height: 44px; }
+  .adm-order-detail-head { flex-direction: column; }
+  .adm-order-detail-head strong { white-space: normal; }
+  .adm-order-item-name { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; }
 
   /* Checkbox cells read as a bare tick with a caption; keep them left-aligned
      and comfortably tappable. */

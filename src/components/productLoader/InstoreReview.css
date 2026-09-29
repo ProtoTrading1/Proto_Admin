@@ -1,0 +1,46 @@
+/* The legacy body overflow-x:hidden creates a non-scrolling overflow ancestor
+   and prevents sticky children from following the document scroll. Clip only
+   while this review is mounted; preserve every other admin layout. */
+body:has(.pl-landed-panel:not([hidden]) .instore-review),
+body:has(.instore-review):not(:has(.pl-landed-panel)) { overflow-x: clip; }
+.instore-review { color: #18304a; container-type: inline-size; margin-top: 24px; min-width: 0; }
+.instore-review * { box-sizing: border-box; }
+.ir-heading, .ir-batch-top, .ir-assignment, .ir-actionbar-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ir-heading { justify-content: space-between; }
+.ir-heading h3, .ir-confirmation h3 { margin: 4px 0 10px; font-size: 21px; }
+.ir-heading p, .ir-batch p { color: #526278; font-size: 13px; }
+.ir-step { color: #60758b; font-size: 11px; font-weight: 750; letter-spacing: .1em; }
+.ir-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0 20px; }
+.ir-counts button { text-align: left; display: grid; gap: 5px; border: 1px solid #dbe3ec; border-radius: 10px; background: #fff; padding: 13px; color: inherit; cursor: pointer; }
+.ir-counts button[aria-pressed=true] { outline: 2px solid #325f87; background: #f0f6fc; }
+.ir-counts strong { font-size: 23px; }.ir-counts span { font-size: 12px; }
+.ir-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.ir-filters label { display: grid; gap: 5px; font-size: 12px; font-weight: 650; flex: 1 1 180px; min-width: 0; }
+.ir-filters input[type=search], .ir-filters select { background: white; border: 1px solid #cad5e1; border-radius: 7px; padding: 9px; min-height: 40px; width: 100%; color: #18304a; }
+.ir-filters .ir-check { display: flex; align-items: center; min-height: 40px; flex: 0 0 auto; }
+.ir-batch { background: #f5f8fc; border: 1px solid #e0e7ef; border-radius: 10px; padding: 14px; margin: 16px 0; }
+.ir-batch-top span { font-size: 12px; color: #526278; }.ir-assignment { align-items: end; }.ir-assignment > * { max-width: 100%; }
+.ir-products { border: 1px solid #dbe3ec; border-radius: 10px; overflow: clip; }
+.ir-table-head, .ir-product { display: grid; grid-template-columns: 42px minmax(180px, 1.3fr) minmax(130px, .8fr) minmax(200px, 1fr); gap: 16px; padding: 16px; }
+.ir-table-head { background: #f3f6fa; font-size: 11px; font-weight: 750; text-transform: uppercase; }
+.ir-product + .ir-product { border-top: 1px solid #e1e7ee; }.ir-product > * { min-width: 0; }
+.ir-select { display: flex; align-items: flex-start; padding-top: 5px; }.instore-review input[type=checkbox] { width: 18px; height: 18px; accent-color: #254e76; flex-shrink: 0; }
+.ir-mobile-label { display: none; }.ir-identity { display: flex; align-items: flex-start; gap: 12px; }
+.ir-identity img { width: 76px; height: 76px; object-fit: contain; border: 1px solid #e0e7ef; border-radius: 7px; background: #fff; flex-shrink: 0; }
+.ir-sku { font-size: 13px; letter-spacing: .02em; overflow-wrap: anywhere; }.ir-identity p { margin: 6px 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.ir-identity small, .ir-status small { color: #607087; font-size: 11px; overflow-wrap: anywhere; }.ir-stock { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.ir-stock > span { font-size: 11px; color: #64758b; }.ir-stock > strong:nth-of-type(2) { margin-top: 9px; }
+.ir-stock details { font-size: 11px; color: #526278; line-height: 1.5; }.ir-stock summary { cursor: pointer; }.ir-stock p { overflow-wrap: anywhere; }
+.ir-status { font-size: 12px; line-height: 1.5; }.ir-status p { margin: 8px 0; }.ir-destination { display: block; margin: 8px 0; overflow-wrap: anywhere; }
+.ir-badge { display: inline-block; padding: 3px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; background: #eef2f7; color: #43566d; }
+.ir-badge--ready { background: #e7f5eb; color: #226641; }.ir-badge--attention { background: #fff3d9; color: #855000; }.ir-badge--not_found { background: #fcebec; color: #a23840; }
+.ir-empty { padding: 20px; }.ir-error { color: #ac2d37; }
+.ir-actionbar { position: sticky; top: calc(var(--ir-header-offset, 0px) + 8px); z-index: 5; background: #fff; border: 1px solid #c9d5e2; box-shadow: 0 5px 20px #19384d12; border-radius: 10px; margin: 12px 0 18px; padding: 12px 16px; }
+.ir-actionbar-controls > strong { flex: 1 1 200px; font-size: 13px; }.ir-actionbar p { margin: 8px 0 0; color: #755016; font-size: 12px; }.ir-preview { display: block; padding: 9px 12px; background: #fff2d4; color: #754f13; border-radius: 6px; margin-bottom: 10px; font-size: 13px; }
+.ir-confirmation, .ir-receipt { margin-top: 20px; border: 1px solid #c9d5e2; border-radius: 10px; padding: 18px; background: #f7fafc; }
+.ir-confirmation p, .ir-receipt p { font-size: 13px; line-height: 1.6; }.ir-confirmation li p { overflow-wrap: anywhere; }.ir-confirmation button { margin: 4px 8px 4px 0; }
+.ir-receipt ul { padding-left: 20px; }.ir-receipt li { margin: 9px 0; font-size: 12px; }.ir-receipt li span { display: block; }.instore-review button:focus-visible, .instore-review input:focus-visible, .instore-review select:focus-visible, .instore-review summary:focus-visible { outline: 3px solid #679ad1; outline-offset: 3px; }
+@container (max-width: 800px) {
+  .ir-table-head { display: none; }.ir-product { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 14px; }.ir-select, .ir-identity { grid-column: 1 / -1; }.ir-select { align-items: center; gap: 8px; }.ir-mobile-label { display: inline; font-size: 12px; }.ir-identity img { width: 88px; height: 88px; }.ir-stock { border-top: 1px solid #e1e7ee; padding-top: 12px; }.ir-status { border-top: 1px solid #e1e7ee; padding-top: 12px; }.ir-counts { grid-template-columns: repeat(2, minmax(0,1fr)); }.ir-actionbar { padding: 10px; }.ir-actionbar-controls { gap: 8px; }.ir-actionbar-controls > .adm-btn-red { flex: 1 1 100%; justify-content: center; }
+}
+@container (max-width: 400px) { .ir-product { grid-template-columns: minmax(0,1fr); }.ir-stock, .ir-status { grid-column: 1; }.ir-counts button { padding: 10px; }.ir-counts strong { font-size: 20px; }.ir-assignment > button { width: 100%; } }

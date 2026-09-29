@@ -1,4 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useProductLoaderLeaveGuard } from '../hooks/useProductLoaderLeaveGuard';
 import {
   Archive,
   ArchiveRestore,
@@ -558,13 +559,14 @@ function WhatsappOptIn({ value }) {
 export default function AdminPage({ customer, onViewPortal, onSignOut }) {
   const initialOrderWorkspaceId = useMemo(() => orderWorkspaceIdFromPath(), []);
   const allowedSectionIds = useMemo(() => sectionsForAdminRole(customer?.role), [customer?.role]);
-  const [activeSection, setActiveSection] = useState(() => {
+  const [activeSection, setActiveSectionState] = useState(() => {
     return initialAdminSectionFromSearch({
       search: window.location.search,
       allowedSectionIds,
       hasOrderWorkspace: Boolean(initialOrderWorkspaceId),
     });
   });
+  const { onPendingWorkChange: onProductLoaderPendingWorkChange, confirmLeave: confirmProductLoaderLeave, requestSectionChange: setActiveSection } = useProductLoaderLeaveGuard(setActiveSectionState);
   const [productLoaderCode, setProductLoaderCode] = useState('');
   const [imageProcessingHandoff, setImageProcessingHandoff] = useState(() => ({
     nutstoreSelection: loadPendingNutstoreHandoff(),
@@ -681,6 +683,8 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
 
   const [orders, setOrders] = useState([]);
   const ordersReqSeqRef = useRef(0);
+  const ordersRequestRef = useRef(null);
+  const loadOrdersRef = useRef(null);
   // What is actually painted right now. loadOrders runs from a 30s timer
   // and a focus handler, whose closures capture whatever `orders` was when
   // they were created — reading the state variable there is unreliable.
@@ -710,6 +714,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
    * pending state a property of the orders request itself.
    */
   const [ordersLoadedKey, setOrdersLoadedKey] = useState('');
+  const [ordersError, setOrdersError] = useState('');
   const [orderTabCounts, setOrderTabCounts] = useState(null);
   const [orderTrashEnabled, setOrderTrashEnabled] = useState(false);
   const [orderSearchDebounced, setOrderSearchDebounced] = useState('');
@@ -933,13 +938,14 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
   const openProductManagerForSku = useCallback((sku) => {
     const cleanSku = String(sku || '').trim().toUpperCase();
     if (!cleanSku) return;
+    if (!setActiveSection('catalogue')) return;
     setProductManagerSearch(cleanSku);
-    setActiveSection('catalogue');
     setLoadingError('');
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
+  }, [setActiveSection]);
 
   const openImageProcessingCentre = useCallback((handoff = {}) => {
+    if (!setActiveSection('image-processing')) return;
     const nutstoreSelection = savePendingNutstoreHandoff(
       Array.isArray(handoff.nutstoreSelection) ? handoff.nutstoreSelection : [],
     );
@@ -947,10 +953,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
       nutstoreSelection,
       uploadSelection: Array.isArray(handoff.uploadSelection) ? handoff.uploadSelection : [],
     });
-    setActiveSection('image-processing');
     setLoadingError('');
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
+  }, [setActiveSection]);
 
   const consumeNutstoreHandoff = useCallback(() => {
     clearPendingNutstoreHandoff();
@@ -1020,12 +1025,19 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
     }
   };
 
-  const loadOrders = async () => {
+  const loadOrders = async ({ force = false } = {}) => {
     // Tab switches and the 30s auto-refresh can put several requests in
     // flight at once; a slow response landing after a newer one used to
     // repaint the list with stale rows — the "order flickers away" bug. Only
     // the latest request may touch state.
     const key = `${orderTab}|${orderPage}|${orderPageSize}|${orderSearchDebounced}`;
+    const activeRequest = ordersRequestRef.current;
+    if (!force && activeRequest?.key === key && activeRequest.seq === ordersReqSeqRef.current) {
+      // A focus event or timer must not supersede the same request while it
+      // is still loading. That used to keep the active tab spinning forever.
+      try { await activeRequest.promise; } catch { /* the first caller reports it */ }
+      return;
+    }
     const seq = (ordersReqSeqRef.current += 1);
     // Paint a previously seen tab instantly from cache while revalidating, so
     // switching tabs never blanks the list or shows another tab's orders.
@@ -1041,14 +1053,17 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
       paintedOrdersRef.current = [];
     }
     ordersCacheKeyRef.current = key;
+    setOrdersError('');
     setLoading(true);
     try {
-      const data = await fetchOrdersPage({
+      const request = fetchOrdersPage({
         page: orderPage,
         pageSize: orderPageSize,
         search: orderSearchDebounced,
         tab: orderTab,
       });
+      ordersRequestRef.current = { key, seq, promise: request };
+      const data = await request;
       if (seq !== ordersReqSeqRef.current) return; // superseded — drop it
       setOrderTrashEnabled(data.orderTrashEnabled);
       // The 30s/focus refresh usually returns exactly what is already on
@@ -1090,7 +1105,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
       }
     } catch (err) {
       if (seq === ordersReqSeqRef.current) {
-        showToast(err.message || 'Failed to load orders', 'error');
+        const message = err.message || 'Failed to load orders';
+        setOrdersError(message);
+        showToast(message, 'error');
         // Settle the key even on failure. Without this the list is stuck
         // "Loading orders…" for good after one failed fetch, because nothing
         // else ever marks the request finished — the toast would be the only
@@ -1098,9 +1115,11 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
         setOrdersLoadedKey(key);
       }
     } finally {
+      if (ordersRequestRef.current?.seq === seq) ordersRequestRef.current = null;
       if (seq === ordersReqSeqRef.current) setLoading(false);
     }
   };
+  loadOrdersRef.current = loadOrders;
 
   const activeFulfillmentUser = useMemo(
     () => fulfillmentUsers.find((u) => u.id === activeFulfillmentUserId) || null,
@@ -1523,7 +1542,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
 
   useEffect(() => {
     if (activeSection !== 'orders') return undefined;
-    const refresh = () => { if (document.visibilityState === 'visible') void loadOrders(); };
+    // The listener lives across tab/page changes, so read the latest callback
+    // instead of the first render's tab and page from a stale closure.
+    const refresh = () => { if (document.visibilityState === 'visible') void loadOrdersRef.current?.(); };
     const timer = setInterval(refresh, 30000);
     window.addEventListener('focus', refresh);
     return () => {
@@ -1810,7 +1831,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
       return reloadTaxonomy();
     }
     if (activeSection === 'orders') {
-      return loadOrders();
+      return loadOrders({ force: true });
     }
     if (activeSection === 'catalogue') {
       queryClient.invalidateQueries({ queryKey: ['catalog'] });
@@ -2371,7 +2392,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
         senderUserId: activeFulfillmentUser?.id,
         senderName: activeFulfillmentUser?.name,
       });
-      await loadOrders();
+      await loadOrders({ force: true });
       closeFulfillment();
       showToast('Order saved and moved to Order Confirmation');
     } catch (err) {
@@ -2423,9 +2444,9 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
             <LiveShoppersDot />
             <button type="button" onClick={goHome} className="adm-btn-ghost" aria-label="Home"><Home size={15} /><span className="adm-btn-text">Home</span></button>
             <button onClick={() => void refreshCurrentSection()} className="adm-btn-ghost" aria-label="Refresh"><RefreshCw size={15} /><span className="adm-btn-text">Refresh</span></button>
-            <button onClick={onViewPortal} className="adm-btn-ghost" aria-label="Portal"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
+            <button onClick={() => { if (confirmProductLoaderLeave()) onViewPortal?.(); }} className="adm-btn-ghost" aria-label="Portal"><ArrowLeftRight size={15} /><span className="adm-btn-text">Portal</span></button>
             {onSignOut && (
-              <button type="button" onClick={onSignOut} className="adm-btn-ghost" title={customer?.email || 'Sign out'} aria-label="Sign out">
+              <button type="button" onClick={() => { if (confirmProductLoaderLeave()) onSignOut(); }} className="adm-btn-ghost" title={customer?.email || 'Sign out'} aria-label="Sign out">
                 <Lock size={15} /><span className="adm-btn-text">Sign out</span>
               </button>
             )}
@@ -2453,7 +2474,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                   setSidebarOpen(false);
                   return;
                 }
-                setActiveSection(id);
+                if (!setActiveSection(id)) return;
                 setLoadingError('');
                 setSidebarOpen(false);
                 if (id === 'catalogue' || id === 'reorder') {
@@ -2570,6 +2591,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
               <SectionErrorBoundary name="product-loader" title="Product Loader crashed" resetKey={activeSection}>
                 <Suspense fallback={<LazySectionFallback label="Loading Product Loader…" />}>
                 <ProductLoaderPanel
+                  onPendingWorkChange={onProductLoaderPendingWorkChange}
                   taxonomyTree={taxonomyTree}
                   onShowToast={showToast}
                   initialCode={productLoaderCode}
@@ -3045,8 +3067,14 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                 )}
                 {orderTab === 'paid' && (
                   <p className="adm-muted" style={{ fontSize: 12, margin: '0 0 12px' }}>
-                    Payment tab includes sent confirmations awaiting payment.
+                    This tab shows confirmations awaiting payment and orders already marked Payment Received.
                   </p>
+                )}
+                {ordersError && (
+                  <div className="adm-order-load-error" role="alert">
+                    <span>{orderRows.length ? 'Showing previously loaded orders. ' : ''}{ordersError}</span>
+                    <button type="button" className="adm-btn-ghost" onClick={() => void loadOrders({ force: true })}>Try again</button>
+                  </div>
                 )}
                 <div className="adm-list">
                   <div className="adm-list-head" style={{ gridTemplateColumns: orderListGridCols }}>
@@ -3150,12 +3178,28 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                               </button>
                             )}
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <span className="adm-muted" style={{ fontSize: 18, lineHeight: 1 }}>{isExpanded ? '↑' : '↓'}</span>
+                          <div className="adm-order-expand-cell">
+                            <button
+                              type="button"
+                              className="adm-order-expand-btn"
+                              aria-expanded={isExpanded}
+                              aria-controls={isExpanded ? `order-detail-${order.id}` : undefined}
+                              aria-label={`${isExpanded ? 'Close' : 'View'} details for order ${displayOrderNumber(order)}`}
+                              onClick={(event) => { event.stopPropagation(); setExpandedOrderId(isExpanded ? null : order.id); }}
+                            >
+                              {isExpanded ? 'Close' : 'View'} <span aria-hidden="true">{isExpanded ? '↑' : '↓'}</span>
+                            </button>
                           </div>
                         </div>
                         {isExpanded && (
-                          <div style={{ background: '#f8fafc', borderTop: '1px solid #f1f5f9', padding: '14px 16px' }}>
+                          <section id={`order-detail-${order.id}`} className="adm-order-detail" aria-label={`Details for order ${displayOrderNumber(order)}`}>
+                            <div className="adm-order-detail-head">
+                              <div>
+                                <h3>{displayOrderNumber(order)}</h3>
+                                <p>{order.customers?.name || 'Unknown customer'} · {dateStr} at {timeStr}</p>
+                              </div>
+                              <strong>{formatRandAmount(orderAmountExVat(order))} <span>ex VAT</span></strong>
+                            </div>
                             <div style={{ marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                               <OrderWorkflowBadge order={order} />
                               {getWorkflowAdvanceOptions(order.status).map(({ label, target }) => (
@@ -3196,7 +3240,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                               <OrderItemsList label="Order placed" items={order.original_items || order.items || []} />
                               <OrderItemsList label="Order final" items={order.final_items || order.items || []} />
                             </div>
-                          </div>
+                          </section>
                         )}
                       </div>
                     );
@@ -3206,7 +3250,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                       <Loader2 size={16} className="spin" /> Loading orders…
                     </div>
                   )}
-                  {!ordersPending && orderRows.length === 0 && (
+                  {!ordersPending && !ordersError && orderRows.length === 0 && (
                     <div style={{ padding: '20px 16px', color: '#6b7280', fontSize: 13 }}>
                       {orderSearch ? 'No orders match your search.' : orderTab === 'all' ? 'No orders yet.' : `No orders in this tab.`}
                     </div>
@@ -4208,7 +4252,7 @@ function OrderItemsList({ label, items }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 11, color: '#374151' }}>{item.code}</div>
-              <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{item.name}</div>
+              <div className="adm-order-item-name" style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{item.name}</div>
             </div>
             <span style={{ fontWeight: 700, fontSize: 13, flexShrink: 0 }}>× {item.qty}</span>
           </div>
