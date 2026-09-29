@@ -8417,6 +8417,11 @@ html, body { background: #f5f5f5; color: #111827; }
 .pm-bulk-apply-description h4 { margin: 0 0 4px; font-size: 13px; color: #1e293b; }
 .pm-bulk-apply-description p { margin: 0 0 10px; color: #64748b; font-size: 12px; line-height: 1.4; }
 .pm-bulk-apply-description-btn { margin-top: 8px; min-height: 34px; }
+.pm-bulk-shared-review { margin-top: 12px; padding: 12px; border: 1px solid #f5c46a; border-radius: 8px; background: #fffbeb; }
+.pm-bulk-shared-review ul { margin: 0 0 12px; padding: 0; list-style: none; max-height: 220px; overflow: auto; }
+.pm-bulk-shared-review li { display: grid; gap: 3px; padding: 8px 0; border-top: 1px solid #f5e4b5; overflow-wrap: anywhere; font-size: 12px; }
+.pm-bulk-shared-review li span { white-space: pre-wrap; }
+.pm-bulk-shared-review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pm-bulk-edit-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #fff; }
 .pm-bulk-edit-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .pm-bulk-edit-card-title { min-width: 0; }

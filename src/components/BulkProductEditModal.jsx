@@ -66,6 +66,7 @@ function categoryPathFromRow(row) {
 
 function rowSnapshot(row) {
   return {
+    title: row.title,
     description: row.description,
     packDescription: row.packDescription,
     unitsOfIssue: row.unitsOfIssue,
@@ -77,6 +78,10 @@ function rowSnapshot(row) {
 
 function buildPayload(original, row) {
   const payload = {};
+  if (row.title !== original.title) {
+    if (!row.title.trim()) throw new Error('Every product needs a product name');
+    payload.name = row.title.trim();
+  }
   if (row.description !== original.description) payload.description = row.description;
   if (row.packDescription !== original.packDescription) payload.packDescription = row.packDescription;
   if (row.unitsOfIssue !== original.unitsOfIssue) payload.unitsOfIssue = row.unitsOfIssue;
@@ -282,6 +287,7 @@ export default function BulkProductEditModal({
   const [taxonomySaving, setTaxonomySaving] = useState(false);
   const [newSub, setNewSub] = useState(null);
   const [descriptionForAll, setDescriptionForAll] = useState('');
+  const [reviewSharedDescription, setReviewSharedDescription] = useState(false);
 
   useEffect(() => {
     setTree(taxonomyTree);
@@ -324,6 +330,7 @@ export default function BulkProductEditModal({
 
   const applyDescriptionToAll = (description) => {
     setRows((prev) => applyDescriptionToAllRows(prev, description));
+    setReviewSharedDescription(false);
   };
 
   const handleSave = async () => {
@@ -388,7 +395,7 @@ export default function BulkProductEditModal({
           </div>
 
           <p className="adm-modal-note">
-            Edit descriptions, pack size, barcode, website SKU, and category placement per product.
+            Edit each product name and description, pack size, barcode, website SKU, and category placement.
             Use child categories 1–3 for the full path. Changes save when you click Save all.
           </p>
 
@@ -396,28 +403,47 @@ export default function BulkProductEditModal({
             {rows.length > 1 && (
               <section className="pm-bulk-apply-description" aria-labelledby="bulk-apply-description-title">
                 <div>
-                  <h4 id="bulk-apply-description-title">Apply one description to all selected products</h4>
-                  <p>Enter the shared description here, then apply it to the draft below. Nothing is saved until you click Save all changes.</p>
+                  <h4 id="bulk-apply-description-title">Optional: use the same description for all {rows.length} products</h4>
+                  <p>Only use this when every product should have identical description text. You can edit each product separately below.</p>
                 </div>
                 <label className="pm-bulk-field">
-                  <span>Description for all selected products</span>
+                  <span>Shared product description</span>
                   <textarea
                     className="adm-field-input"
                     rows={3}
                     value={descriptionForAll}
-                    onChange={(e) => setDescriptionForAll(e.target.value)}
+                    onChange={(e) => { setDescriptionForAll(e.target.value); setReviewSharedDescription(false); }}
                     placeholder="e.g. Metal die-cast racing car"
                     style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
                 </label>
-                <button
-                  type="button"
-                  className="adm-btn-ghost pm-bulk-apply-description-btn"
-                  onClick={() => applyDescriptionToAll(descriptionForAll)}
-                  disabled={!descriptionForAll.trim()}
-                >
-                  Apply to all selected products
-                </button>
+                {!reviewSharedDescription ? (
+                  <button
+                    type="button"
+                    className="adm-btn-ghost pm-bulk-apply-description-btn"
+                    onClick={() => setReviewSharedDescription(true)}
+                    disabled={!descriptionForAll.trim() || saving}
+                  >
+                    Review before applying to {rows.length} products
+                  </button>
+                ) : (
+                  <div className="pm-bulk-shared-review" role="group" aria-label="Review shared description changes">
+                    <p><strong>Review the draft changes:</strong> this will replace the descriptions below for {rows.length} products. Product names and other fields will not change. Nothing is saved to the website until you click Save all changes.</p>
+                    <ul>
+                      {rows.map((row, index) => (
+                        <li key={originals[index].sku}>
+                          <strong>{row.title || originals[index].sku}</strong>
+                          <span>Current: {row.description || '(empty)'}</span>
+                          <span>New: {descriptionForAll}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="pm-bulk-shared-review-actions">
+                      <button type="button" className="adm-btn-ghost" onClick={() => setReviewSharedDescription(false)}>Cancel</button>
+                      <button type="button" className="adm-btn-red" onClick={() => applyDescriptionToAll(descriptionForAll)}>Apply to draft</button>
+                    </div>
+                  </div>
+                )}
               </section>
             )}
             {rows.map((row, index) => (
@@ -435,6 +461,16 @@ export default function BulkProductEditModal({
                 </header>
 
                 <div className="pm-bulk-edit-fields">
+                  <label className="pm-bulk-field pm-bulk-field--full">
+                    <span>Product name (shown on website)</span>
+                    <input
+                      type="text"
+                      className="adm-field-input"
+                      value={row.title}
+                      onChange={(e) => patchRow(index, { title: e.target.value })}
+                      required
+                    />
+                  </label>
                   <label className="pm-bulk-field">
                     <span>Website SKU (WSK)</span>
                     <input
@@ -471,7 +507,7 @@ export default function BulkProductEditModal({
                     />
                   </div>
                   <label className="pm-bulk-field pm-bulk-field--full">
-                    <span>Description</span>
+                    <span>Product description (shown on website)</span>
                     <textarea
                       className="adm-field-input"
                       rows={3}
@@ -499,8 +535,8 @@ export default function BulkProductEditModal({
           <div className="adm-modal-footer adm-modal-footer--end">
             <div className="adm-modal-footer__actions">
               <button type="button" className="adm-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-              <button type="button" className="adm-btn-red" onClick={() => void handleSave()} disabled={saving || taxonomySaving}>
-                {saving ? <><Loader2 size={14} className="spin" /> Saving…</> : `Save all changes (${rows.length})`}
+              <button type="button" className="adm-btn-red" onClick={() => void handleSave()} disabled={saving || taxonomySaving || reviewSharedDescription}>
+                {saving ? <><Loader2 size={14} className="spin" /> Saving…</> : reviewSharedDescription ? 'Finish description review first' : `Save all changes (${rows.length})`}
               </button>
             </div>
           </div>
