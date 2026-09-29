@@ -1257,6 +1257,7 @@ export default function ProductManagerEngine({
         archivedSource: status === 'archived' && archiveStockView === 'archived' ? archiveSourceFilter : undefined,
         archiveSection: status === 'archived' && archiveStockView === 'archived' ? archiveSection : undefined,
         onlyInStock: status === 'live' && onlyInStock,
+        toOrderOnly: status === 'live' && toOrderOnly,
       });
       // Products that are in this category only via an additional placement
       // are NOT selected. Bulk move/archive rewrite the PRIMARY category, so
@@ -1739,7 +1740,7 @@ export default function ProductManagerEngine({
               )}
               {rows.length > 0 && !reorderMode && (
                 <div className="pm-select-toolbar" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
-                  {total > rows.length && (
+                  {total > 0 && !selectAllView && (
                     <button
                       type="button"
                       className="adm-btn-ghost adm-btn--sm"

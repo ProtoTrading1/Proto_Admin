@@ -125,6 +125,26 @@ describe('Product Loader colour variants', () => {
     });
   });
 
+  it('uses live Positill for GERMOL even when the wrong ex-VAT website price is on the price grid', () => {
+    expect(resolveLoaderCustomerPrice({
+      productSellPrice: 11.5,
+      websitePrice: 10,
+      positillPrice: 10,
+      positillSource: 'erp_sql',
+    })).toEqual({
+      price: 11.5,
+      source: 'positill.live_price_a_ex_vat_converted',
+    });
+  });
+
+  it('does not add VAT again to an established website price without verified live SQL', () => {
+    expect(resolveLoaderCustomerPrice({
+      websitePrice: 11.5,
+      positillPrice: 10,
+      positillSource: 'stmast_cache',
+    })).toEqual({ price: 11.5, source: 'website_stock.price_incl_vat' });
+  });
+
   it('converts raw PRICE_A when no established website price exists yet', () => {
     expect(resolveLoaderCustomerPrice({
       positillPrice: 43.04,

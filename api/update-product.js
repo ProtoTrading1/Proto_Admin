@@ -7,6 +7,7 @@ import { parseExtraLabels } from '../lib/taxonomy-match.mjs';
 import { deriveMotarroPathFromLabels, isMotarroProduct, motarroPathSnapshot } from './_mottaro-category.js';
 import { buildMoveTagPatch, tableHasMoveTagColumns } from './_move-tag.js';
 import { normalizeUnitsOfIssue } from '../lib/selling-unit.mjs';
+import { customerPriceFromPositill } from '../lib/catalogue-price.mjs';
 
 const CATEGORY_COLS = ['category', 'subcategory_one', 'subcategory_two', 'subcategory_three', 'subcategory_four'];
 
@@ -224,6 +225,7 @@ export default async function handler(req, res) {
         imageSlot: 1,
       });
       if (match?.sqlRow) {
+        const customerPrice = customerPriceFromPositill(match.sqlRow.price);
         await ensureProductFromCatalogueRow(supabase, {
           ...verified,
           barcode: verified.barcode || verified.sku,
@@ -234,7 +236,7 @@ export default async function handler(req, res) {
         });
         const relinkPatch = {
           updated_at: new Date().toISOString(),
-          price: Number(match.sqlRow.price) || 0,
+          price: customerPrice,
           stock_qty: Number(match.sqlRow.onhand) || 0,
           available_stock: Number.isFinite(Number(match.sqlRow.available))
             ? Number(match.sqlRow.available)
@@ -260,7 +262,7 @@ export default async function handler(req, res) {
           matched: true,
           matchedBy: match.matchedBy,
           stock: match.sqlRow.available,
-          price: match.sqlRow.price,
+          price: customerPrice,
         };
       } else if (match?.websiteRow) {
         const relinkPatch = {

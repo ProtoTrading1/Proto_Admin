@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart2, Download, Loader2, X } from 'lucide-react';
 import { ADMIN_REFRESH_EVENT } from '../lib/adminRefresh';
+import { noRecordedOpenEmails } from '../../lib/email-follow-up.mjs';
 
 /**
  * Email analytics as a SPREADSHEET, not a wall of text.
@@ -495,7 +496,7 @@ function CampaignDetail({ campaign, onClose, onCompose }) {
   const approvals = campaignApprovalData(campaign);
   const snapshotEmails = uniqueEmails(campaign.recipientEmails);
   const hasRecipientSnapshot = snapshotEmails.length > 0;
-  const noRecordedOpen = data.emails.filter((email) => data.accepted.has(email) && !data.opened.has(email));
+  const noRecordedOpen = noRecordedOpenEmails(data.emails, data);
   const openedNoClick = data.emails.filter((email) => data.opened.has(email) && !data.clicked.has(email));
   const legacyKnownEmails = data.emails;
   const groups = [
