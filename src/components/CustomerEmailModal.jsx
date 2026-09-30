@@ -258,32 +258,14 @@ export default function CustomerEmailModal({
     if (aud === 'group') setBusinessTypes([]);
   };
 
-  // A native <select> whose `value` matches no <option> silently displays the
-  // FIRST option and fires no onChange. So the form could sit on
-  // audience='group' with an empty groupId while the control read "Approved
-  // trade customers" — invisible here, and rejected by the server only at Send
-  // time ("Choose a group to send to."). Reconcile state to something the
-  // control can actually show.
-  useEffect(() => {
-    if (!open || !audienceOptions.length) return;
-    if (audienceOptions.some((opt) => opt.value === audienceValue)) return;
-    const groupOpts = audienceOptions.filter((opt) => opt.value.startsWith('group::'));
-    // A group audience that lost its id: recover it when there is only one
-    // group to mean, rather than silently retargeting the send.
-    if (audience === 'group' && groupOpts.length === 1) {
-      setGroupId(groupOpts[0].value.slice('group::'.length));
-      return;
-    }
-    const [aud, id = ''] = String(audienceOptions[0].value).split('::');
-    setAudience(aud);
-    setGroupId(aud === 'group' ? id : '');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, audienceOptions, audienceValue, audience]);
-
+  // Never silently replace an explicitly chosen group while its options load,
+  // or when loading fails / the group was removed. An unavailable target blocks
+  // sending until the admin explicitly chooses a valid audience.
   const selectedAudience = useMemo(
-    () => audienceOptions.find((opt) => opt.value === audienceValue) || audienceOptions[0],
+    () => audienceOptions.find((opt) => opt.value === audienceValue),
     [audienceOptions, audienceValue],
   );
+  const audienceUnavailable = audience !== 'selected' && !selectedAudience;
 
 
   const previewSubject = useMemo(
@@ -329,6 +311,10 @@ export default function CustomerEmailModal({
 
 
   const handleSend = async (test = false) => {
+    if (audienceUnavailable) {
+      onShowToast?.('The selected audience is unavailable. Choose an audience before sending.', 'error');
+      return;
+    }
     if (!subject.trim()) {
       onShowToast?.('Subject is required', 'error');
       return;
@@ -464,12 +450,15 @@ export default function CustomerEmailModal({
               value={audienceValue}
               onChange={(e) => onAudienceChange(e.target.value)}
             >
+              {!selectedAudience && (
+                <option value={audienceValue} disabled>{audience === 'selected' ? 'Specific people' : 'Selected group — loading or unavailable'}</option>
+              )}
               {audienceOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
             <span className="adm-email-field__hint">
-              {selectedAudience.hint}
+              {selectedAudience?.hint || (audience === 'selected' ? 'Only the addresses listed below.' : 'Waiting for the selected group. No other audience will be substituted.')}
               {groupsError ? ` — groups unavailable: ${groupsError}` : ''}
             </span>
           </label>
@@ -782,7 +771,7 @@ export default function CustomerEmailModal({
             <button
               type="button"
               className="adm-btn-red"
-              disabled={sending || testSending || (audience === 'selected' && !selectedEmails.length)}
+              disabled={sending || testSending || audienceUnavailable || (audience === 'selected' && !selectedEmails.length)}
               onClick={() => void handleSend(false)}
             >
               {sending ? <><Loader2 size={14} className="spin" /> Sending…</> : <><Send size={14} /> Send now{audience === 'selected' && selectedEmails.length ? ` (${selectedEmails.length})` : ''}</>}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, UserX } from 'lucide-react';
 import { ADMIN_REFRESH_EVENT } from '../lib/adminRefresh';
 
@@ -18,52 +18,58 @@ function formatWhen(value) {
 }
 
 export default function EmailUnsubscribesPanel({ onShowToast }) {
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [allRows, setAllRows] = useState([]);
+  const [loadError, setLoadError] = useState('');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [loading, setLoading] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
   const [savingManualEmail, setSavingManualEmail] = useState(false);
+  const toastRef = useRef(onShowToast);
+  toastRef.current = onShowToast;
+  const requestRef = useRef(0);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search.trim()), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  const load = useCallback(async (pageArg = page, searchArg = searchDebounced) => {
+  const load = useCallback(async () => {
+    const requestId = ++requestRef.current;
     setLoading(true);
+    setLoadError('');
     try {
-      const params = new URLSearchParams({
-        page: String(pageArg),
-        pageSize: String(PAGE_SIZE),
-      });
-      if (searchArg) params.set('search', searchArg);
+      // Fetch one complete, authenticated snapshot. Paging/searching it must
+      // not repeat the full Brevo scan for each screen of 50 contacts.
+      const params = new URLSearchParams({ all: '1' });
       const res = await fetch(`/api/email-unsubscribes?${params.toString()}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load unsubscribed contacts');
-      setRows(json.rows || []);
-      setTotal(Number(json.total || 0));
+      if (requestId !== requestRef.current) return;
+      setAllRows(json.rows || []);
     } catch (err) {
-      onShowToast?.(err.message || 'Failed to load unsubscribed contacts', 'error');
-      setRows([]);
-      setTotal(0);
+      if (requestId !== requestRef.current) return;
+      setLoadError(err.message || 'Failed to load unsubscribed contacts');
+      toastRef.current?.(err.message || 'Failed to load unsubscribed contacts', 'error');
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
-  }, [onShowToast, page, searchDebounced]);
+  }, []);
 
   useEffect(() => { setPage(1); }, [searchDebounced]);
-  useEffect(() => { void load(page, searchDebounced); }, [load, page, searchDebounced]);
+  useEffect(() => {
+    void load();
+    return () => { requestRef.current += 1; };
+  }, [load]);
 
   useEffect(() => {
     const onRefresh = (event) => {
-      if (event.detail === 'comms') void load(page, searchDebounced);
+      if (event.detail === 'comms') void load();
     };
     window.addEventListener(ADMIN_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(ADMIN_REFRESH_EVENT, onRefresh);
-  }, [load, page, searchDebounced]);
+  }, [load]);
 
   async function handleAddManualEmail(event) {
     event.preventDefault();
@@ -83,7 +89,7 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
       if (!res.ok) throw new Error(json.error || 'Failed to add unsubscribed email');
       setManualEmail('');
       onShowToast?.('Email added to unsubscribed contacts', 'success');
-      await load(1, searchDebounced);
+      await load();
       setPage(1);
     } catch (err) {
       onShowToast?.(err.message || 'Failed to add unsubscribed email', 'error');
@@ -92,7 +98,12 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
     }
   }
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
+  const filteredRows = useMemo(() => allRows.filter((row) => !searchDebounced ||
+    [row.email, row.business_name, row.contact_name].some((value) =>
+      String(value || '').toLowerCase().includes(searchDebounced.toLowerCase()))), [allRows, searchDebounced]);
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const rows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div>
@@ -114,12 +125,13 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
             <Search size={14} />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search email..." className="adm-search-input" />
           </label>
-          <button type="button" className="adm-btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => void load(page, searchDebounced)} disabled={loading || savingManualEmail} title="Reload unsubscribed contacts">
+          <button type="button" className="adm-btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => void load()} disabled={loading || savingManualEmail} title="Reload unsubscribed contacts">
             {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
           </button>
         </div>
       </div>
 
+      {loadError && <p role="alert" style={{ color: '#b91c1c' }}>{loadError}. Use reload to try again; any previously loaded records may be out of date.</p>}
       <div className="adm-list">
         <div className="adm-list-head" style={{ gridTemplateColumns: '1.2fr 1fr 1.4fr 180px' }}>
           <span>Business</span><span>Contact</span><span>Email</span><span>Unsubscribed</span>
@@ -132,7 +144,7 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
             <div data-label="Unsubscribed" className="adm-muted" style={{ fontSize: 12 }}>{formatWhen(row.unsubscribed_at)}</div>
           </div>
         ))}
-        {!loading && rows.length === 0 && (
+        {!loading && !loadError && rows.length === 0 && (
           <div style={{ padding: '20px 16px', color: '#6b7280', fontSize: 13 }}>
             {searchDebounced ? 'No unsubscribed contacts match this search.' : 'No unsubscribed contacts yet.'}
           </div>
@@ -149,7 +161,7 @@ export default function EmailUnsubscribesPanel({ onShowToast }) {
           <button type="button" className="adm-btn-ghost" style={{ padding: '4px 10px' }} disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))} aria-label="Previous page">
             <ChevronLeft size={14} />
           </button>
-          <span className="adm-muted" style={{ fontSize: 12 }}>Page {page} of {totalPages}</span>
+          <span className="adm-muted" style={{ fontSize: 12 }}>Page {currentPage} of {totalPages}</span>
           <button type="button" className="adm-btn-ghost" style={{ padding: '4px 10px' }} disabled={page >= totalPages || loading} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} aria-label="Next page">
             <ChevronRight size={14} />
           </button>

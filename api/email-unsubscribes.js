@@ -27,6 +27,18 @@ async function fetchPortalCustomers(sb) {
   return rows;
 }
 
+async function fetchLocalOptOuts(sb) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('marketing_email_opt_outs')
+      .select('email, source, unsubscribed_at, created_at').order('email')
+      .range(from, from + 999);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if ((data || []).length < 1000) return rows;
+  }
+}
+
 export default async function handler(req, res) {
   if (!(await requireAdminKey(req, res))) return;
   res.setHeader('Cache-Control', 'no-store');
@@ -75,21 +87,19 @@ export default async function handler(req, res) {
   const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
   const pageSize = Math.min(PAGE_SIZE_MAX, Math.max(1, Number.parseInt(String(req.query.pageSize || '50'), 10) || 50));
   const search = String(req.query.search || '').trim().toLowerCase();
+  const allRows = req.query.all === '1';
   try {
     const sb = getPortalDbClient();
-    const [localResult, brevoRows, customers] = await Promise.all([
-      sb
-      .from('marketing_email_opt_outs')
-      .select('email, source, unsubscribed_at, created_at'),
+    const [localRows, brevoRows, customers] = await Promise.all([
+      fetchLocalOptOuts(sb),
       listBrevoSuppressedContacts(),
       fetchPortalCustomers(sb),
     ]);
-    if (localResult.error) throw localResult.error;
 
     const customersByEmail = new Map(customers.map((customer) => [String(customer.email || '').trim().toLowerCase(), customer]));
     const rowsByEmail = new Map();
     for (const row of brevoRows) rowsByEmail.set(row.email, row);
-    for (const row of localResult.data || []) {
+    for (const row of localRows) {
       const email = String(row.email || '').trim().toLowerCase();
       if (!email) continue;
       rowsByEmail.set(email, { ...rowsByEmail.get(email), ...row, email });
@@ -105,7 +115,7 @@ export default async function handler(req, res) {
       .some((value) => String(value || '').toLowerCase().includes(search)))
       .sort((a, b) => String(b.unsubscribed_at || b.created_at || '').localeCompare(String(a.unsubscribed_at || a.created_at || '')));
     const from = (page - 1) * pageSize;
-    const rows = merged.slice(from, from + pageSize);
+    const rows = allRows ? merged : merged.slice(from, from + pageSize);
 
     return res.status(200).json({
       rows,

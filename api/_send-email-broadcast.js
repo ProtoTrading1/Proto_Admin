@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchCustomerAudience, fetchRecipientsByEmail, sendBroadcastBatch } from './_brevo-email.js';
 import { appendEmailCampaign } from './_email-campaigns.js';
 import { markCustomersEmailed, markCrmContactsEmailed } from './_customer-email-status.js';
+import { excludeBrevoSuppressedRecipients } from './_brevo-suppression.js';
 
 export const VALID_EMAIL_AUDIENCE = new Set(['requests', 'regular', 'proto-active', 'all-portal', 'all-approved', 'selected', 'group']);
 
@@ -21,13 +22,14 @@ export async function runEmailBroadcast({ audience, subject, introText = '', htm
   const sb = getPortalDbClient();
   // Explicit recipient list ("Specific people") bypasses audience resolution.
   const useSelected = Array.isArray(recipientEmails) && recipientEmails.length > 0;
-  const recipients = useSelected
+  const resolvedRecipients = useSelected
     ? await fetchRecipientsByEmail(sb, recipientEmails.map((r) => (typeof r === 'string' ? r : r?.email)))
     : await fetchCustomerAudience(sb, audience, {
       businessTypes: Array.isArray(businessTypes) ? businessTypes : [],
       importBatch,
       groupId,
     });
+  const recipients = await excludeBrevoSuppressedRecipients(resolvedRecipients);
   if (!recipients.length) {
     return {
       ok: false,
