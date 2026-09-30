@@ -3,6 +3,7 @@ import { labelToSlug, resolveCategoryIdsFromTree, slugToLabel, slugToLabelFromTr
 import { queryClient } from './queryClient';
 import { queryKeys } from './queryKeys';
 import { readApiJson } from './apiError.js';
+import { imageCanvasDimensions, prepareProductManagerImage } from './productImageUpload.js';
 import { enrichMotarroCategoryFields } from '../../lib/mottaro-category.mjs';
 import { parseExtraLabels } from '../../lib/taxonomy-match.mjs';
 
@@ -405,20 +406,15 @@ export async function checkStock() { return null; }
 
 // ─── Image helpers ────────────────────────────────────────────────────────────
 
-export function compressImage(file) {
+export function compressImage(file, options = {}) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const SIZE = 800;
-      const scale = Math.min(1, SIZE / Math.max(img.width || 1, img.height || 1));
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const offsetX = Math.round((SIZE - w) / 2);
-      const offsetY = Math.round((SIZE - h) / 2);
+      const { width, height, w, h, offsetX, offsetY } = imageCanvasDimensions(img.width, img.height, options);
       const canvas = document.createElement('canvas');
-      canvas.width = SIZE;
-      canvas.height = SIZE;
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         URL.revokeObjectURL(url);
@@ -426,7 +422,7 @@ export function compressImage(file) {
         return;
       }
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, SIZE, SIZE);
+      ctx.fillRect(0, 0, width, height);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, offsetX, offsetY, w, h);
@@ -443,18 +439,18 @@ export function compressImage(file) {
 
 
 export async function uploadDormantImage(file) {
-  const compressed = await compressImage(file);
+  const prepared = await prepareProductManagerImage(file, compressImage);
   const base64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || '').split(',')[1]);
     reader.onerror = reject;
-    reader.readAsDataURL(compressed);
+    reader.readAsDataURL(prepared.file);
   });
 
   const res = await fetch('/api/upload-product-image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename: file.name, contentType: 'image/jpeg', base64 }),
+    body: JSON.stringify({ filename: prepared.filename, contentType: prepared.contentType, base64 }),
   });
   const json = await readApiJson(res, { fallback: 'Upload failed' });
   return json.url;
