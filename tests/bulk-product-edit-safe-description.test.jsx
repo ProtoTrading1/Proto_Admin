@@ -85,7 +85,7 @@ it('requires review before applying shared text and preserves each soap name', a
   expect(container.querySelector('.pm-bulk-shared-review').textContent).toContain('Aloe soap');
   expect(container.querySelector('.pm-bulk-shared-review').textContent).toContain('Menthol soap');
   expect(cards.map((card) => card.querySelector('textarea').value)).toEqual(['Aloe soap', 'Menthol soap']);
-  expect([...container.querySelectorAll('button')].find((button) => button.textContent.includes('Finish description review first')).disabled).toBe(true);
+  expect([...container.querySelectorAll('button')].find((button) => button.textContent.includes('Finish shared-field review first')).disabled).toBe(true);
 
   await click([...container.querySelectorAll('button')].find((button) => button.textContent === 'Cancel'));
   expect(container.querySelector('.pm-bulk-shared-review')).toBeNull();
@@ -102,5 +102,50 @@ it('requires review before applying shared text and preserves each soap name', a
   expect(updateProduct).toHaveBeenCalledTimes(2);
   expect(updateProduct).toHaveBeenCalledWith('GERMOL-5ALOE', { description: 'A shared soap description' });
   expect(updateProduct).toHaveBeenCalledWith('GERMOL-4MENTHOL', { description: 'A shared soap description' });
+  await act(async () => root.unmount());
+});
+
+it('lets the editor deliberately give all selected soaps one name without changing descriptions', async () => {
+  const { container, root } = await renderModal();
+  const cards = [...container.querySelectorAll('.pm-bulk-edit-card')];
+  const sharedName = [...container.querySelectorAll('.pm-bulk-apply-description label')]
+    .find((label) => label.textContent.includes('Shared product name')).querySelector('input');
+  const nameInputs = cards.map((card) => [...card.querySelectorAll('label')]
+    .find((label) => label.querySelector('span')?.textContent === 'Product name (shown on website)')?.querySelector('input'));
+
+  await setValue(sharedName, 'GERMOL HYGIENE SOAP 175g');
+  expect(nameInputs.map((input) => input.value)).toEqual(products.map((product) => product.title));
+  await click([...container.querySelectorAll('button')].find((button) => button.textContent.includes('Review before applying')));
+  expect(container.querySelector('.pm-bulk-shared-review').textContent).toContain('Distinct variant names will be lost');
+  expect([...container.querySelectorAll('button')].find((button) => button.textContent.includes('Finish shared-field review first')).disabled).toBe(true);
+  expect(updateProduct).not.toHaveBeenCalled();
+
+  await click([...container.querySelectorAll('button')].find((button) => button.textContent === 'Apply to draft'));
+  expect(nameInputs.map((input) => input.value)).toEqual(['GERMOL HYGIENE SOAP 175g', 'GERMOL HYGIENE SOAP 175g']);
+  expect(cards.map((card) => card.querySelector('textarea').value)).toEqual(['Aloe soap', 'Menthol soap']);
+  expect(updateProduct).not.toHaveBeenCalled();
+
+  await click([...container.querySelectorAll('button')].find((button) => button.textContent.includes('Save all changes')));
+  expect(updateProduct).toHaveBeenCalledTimes(2);
+  expect(updateProduct).toHaveBeenCalledWith('GERMOL-5ALOE', { name: 'GERMOL HYGIENE SOAP 175g' });
+  expect(updateProduct).toHaveBeenCalledWith('GERMOL-4MENTHOL', { name: 'GERMOL HYGIENE SOAP 175g' });
+  await act(async () => root.unmount());
+});
+
+it('applies a shared name and description together while preserving SKU and other fields', async () => {
+  const { container, root } = await renderModal();
+  const sharedName = [...container.querySelectorAll('.pm-bulk-apply-description label')]
+    .find((label) => label.textContent.includes('Shared product name')).querySelector('input');
+  const sharedDescription = container.querySelector('.pm-bulk-apply-description textarea');
+  await setValue(sharedName, 'GERMOL HYGIENE SOAP 175g');
+  await setValue(sharedDescription, 'One shared description');
+  await click([...container.querySelectorAll('button')].find((button) => button.textContent.includes('Review before applying')));
+  expect(container.querySelector('.pm-bulk-shared-review').textContent).toContain('Aloe soap');
+  expect(container.querySelector('.pm-bulk-shared-review').textContent).toContain('GERMOL HYGIENE SOAP MENTHOL 175g');
+  await click([...container.querySelectorAll('button')].find((button) => button.textContent === 'Apply to draft'));
+  await click([...container.querySelectorAll('button')].find((button) => button.textContent.includes('Save all changes')));
+  expect(updateProduct).toHaveBeenCalledTimes(2);
+  expect(updateProduct).toHaveBeenCalledWith('GERMOL-5ALOE', { name: 'GERMOL HYGIENE SOAP 175g', description: 'One shared description' });
+  expect(updateProduct).toHaveBeenCalledWith('GERMOL-4MENTHOL', { name: 'GERMOL HYGIENE SOAP 175g', description: 'One shared description' });
   await act(async () => root.unmount());
 });

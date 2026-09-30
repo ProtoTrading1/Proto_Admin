@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Loader2, Plus, X } from 'lucide-react';
 import { setLiveTaxonomyTree, updateProduct } from '../lib/products';
-import { applyDescriptionToAllRows } from '../lib/bulkProductEdit';
+import { applySharedFieldsToAllRows } from '../lib/bulkProductEdit';
 import SellingUnitField from './SellingUnitField';
 import {
   childrenOfTree,
@@ -286,8 +286,9 @@ export default function BulkProductEditModal({
   const [saving, setSaving] = useState(false);
   const [taxonomySaving, setTaxonomySaving] = useState(false);
   const [newSub, setNewSub] = useState(null);
+  const [nameForAll, setNameForAll] = useState('');
   const [descriptionForAll, setDescriptionForAll] = useState('');
-  const [reviewSharedDescription, setReviewSharedDescription] = useState(false);
+  const [reviewSharedFields, setReviewSharedFields] = useState(false);
 
   useEffect(() => {
     setTree(taxonomyTree);
@@ -328,9 +329,9 @@ export default function BulkProductEditModal({
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
-  const applyDescriptionToAll = (description) => {
-    setRows((prev) => applyDescriptionToAllRows(prev, description));
-    setReviewSharedDescription(false);
+  const applySharedFieldsToAll = () => {
+    setRows((prev) => applySharedFieldsToAllRows(prev, { title: nameForAll, description: descriptionForAll }));
+    setReviewSharedFields(false);
   };
 
   const handleSave = async () => {
@@ -403,44 +404,55 @@ export default function BulkProductEditModal({
             {rows.length > 1 && (
               <section className="pm-bulk-apply-description" aria-labelledby="bulk-apply-description-title">
                 <div>
-                  <h4 id="bulk-apply-description-title">Optional: use the same description for all {rows.length} products</h4>
-                  <p>Only use this when every product should have identical description text. You can edit each product separately below.</p>
+                  <h4 id="bulk-apply-description-title">Optional: use the same name and/or description for all {rows.length} products</h4>
+                  <p>Fill in only the fields you want to make identical. Leave a field blank to keep each product’s current value. You can edit products separately below.</p>
                 </div>
+                <label className="pm-bulk-field">
+                  <span>Shared product name</span>
+                  <input
+                    type="text"
+                    className="adm-field-input"
+                    value={nameForAll}
+                    onChange={(e) => { setNameForAll(e.target.value); setReviewSharedFields(false); }}
+                    placeholder="Use only if every selected product should have the same name"
+                  />
+                </label>
                 <label className="pm-bulk-field">
                   <span>Shared product description</span>
                   <textarea
                     className="adm-field-input"
                     rows={3}
                     value={descriptionForAll}
-                    onChange={(e) => { setDescriptionForAll(e.target.value); setReviewSharedDescription(false); }}
+                    onChange={(e) => { setDescriptionForAll(e.target.value); setReviewSharedFields(false); }}
                     placeholder="e.g. Metal die-cast racing car"
                     style={{ resize: 'vertical', fontFamily: 'inherit' }}
                   />
                 </label>
-                {!reviewSharedDescription ? (
+                {!reviewSharedFields ? (
                   <button
                     type="button"
                     className="adm-btn-ghost pm-bulk-apply-description-btn"
-                    onClick={() => setReviewSharedDescription(true)}
-                    disabled={!descriptionForAll.trim() || saving}
+                    onClick={() => setReviewSharedFields(true)}
+                    disabled={(!nameForAll.trim() && !descriptionForAll.trim()) || saving}
                   >
                     Review before applying to {rows.length} products
                   </button>
                 ) : (
-                  <div className="pm-bulk-shared-review" role="group" aria-label="Review shared description changes">
-                    <p><strong>Review the draft changes:</strong> this will replace the descriptions below for {rows.length} products. Product names and other fields will not change. Nothing is saved to the website until you click Save all changes.</p>
+                  <div className="pm-bulk-shared-review" role="group" aria-label="Review shared name and description changes">
+                    <p><strong>Review the draft changes:</strong> only the filled-in fields will be replaced for {rows.length} products. Their SKUs and other fields will not change. Nothing is saved to the website until you click Save all changes.</p>
+                    {nameForAll.trim() && <p>These products will all have the same name. Distinct variant names will be lost if you save.</p>}
                     <ul>
                       {rows.map((row, index) => (
                         <li key={originals[index].sku}>
-                          <strong>{row.title || originals[index].sku}</strong>
-                          <span>Current: {row.description || '(empty)'}</span>
-                          <span>New: {descriptionForAll}</span>
+                          <strong>{originals[index].sku}</strong>
+                          {nameForAll.trim() && <span>Name: {row.title || '(empty)'} → {nameForAll.trim()}</span>}
+                          {descriptionForAll.trim() && <span>Description: {row.description || '(empty)'} → {descriptionForAll}</span>}
                         </li>
                       ))}
                     </ul>
                     <div className="pm-bulk-shared-review-actions">
-                      <button type="button" className="adm-btn-ghost" onClick={() => setReviewSharedDescription(false)}>Cancel</button>
-                      <button type="button" className="adm-btn-red" onClick={() => applyDescriptionToAll(descriptionForAll)}>Apply to draft</button>
+                      <button type="button" className="adm-btn-ghost" onClick={() => setReviewSharedFields(false)}>Cancel</button>
+                      <button type="button" className="adm-btn-red" onClick={applySharedFieldsToAll}>Apply to draft</button>
                     </div>
                   </div>
                 )}
@@ -535,8 +547,8 @@ export default function BulkProductEditModal({
           <div className="adm-modal-footer adm-modal-footer--end">
             <div className="adm-modal-footer__actions">
               <button type="button" className="adm-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-              <button type="button" className="adm-btn-red" onClick={() => void handleSave()} disabled={saving || taxonomySaving || reviewSharedDescription}>
-                {saving ? <><Loader2 size={14} className="spin" /> Saving…</> : reviewSharedDescription ? 'Finish description review first' : `Save all changes (${rows.length})`}
+              <button type="button" className="adm-btn-red" onClick={() => void handleSave()} disabled={saving || taxonomySaving || reviewSharedFields}>
+                {saving ? <><Loader2 size={14} className="spin" /> Saving…</> : reviewSharedFields ? 'Finish shared-field review first' : `Save all changes (${rows.length})`}
               </button>
             </div>
           </div>
