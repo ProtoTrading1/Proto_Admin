@@ -12,6 +12,16 @@ async function render(props) { container = document.createElement('div'); docume
 async function click(element) { await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true }))); }
 
 describe('shopping analytics UI', () => {
+  it('explains zero new tracking alongside positive earlier records without inventing a tracking start',async()=>{
+    const data=payload();data.summary.recordedVisits=0;data.historicalSummary={searches:{count:18,status:'available',label:'Earlier search records',source:'Catalogue not recorded'},presenceRecords:{count:6,status:'available',label:'Presence records',source:'Catalogue not recorded'},actualOrders:{count:4,status:'available',label:'Saved order records',source:'All catalogues'}};
+    await render({loader:async()=>data});const context=container.querySelector('.sa2-tracking-context');expect(context.textContent).toContain('first recorded production activity is unavailable');expect(context.textContent).toContain('existing records or saved orders are available');expect(context.textContent).toContain('18');expect(context.textContent).toContain('Saved order records');expect(context.textContent).toContain('all catalogues and statuses');expect(context.textContent).toContain('not unique customer visits');expect(container.textContent).toContain('Existing customer records may exist');
+  });
+  it('labels the first retained production event independently of selected filters without calling it activation',async()=>{
+    const data=payload();data.trackingStart={firstProductionEventAt:'2026-09-01T12:00:00Z',available:true};await render({loader:async()=>data});const context=container.querySelector('.sa2-tracking-context');expect(context.textContent).toContain('First recorded production activity:');expect(context.textContent).toContain('including internal activity');expect(context.textContent).toContain('across all periods and catalogues');expect(context.textContent).toContain('not a deployment date');expect(context.textContent).toContain('Historical source counts are not supplied');
+  });
+  it('shows historical catalogue gaps, partial counts and missing sources as distinct states',async()=>{
+    const data=payload();data.historicalSummary={searches:{count:null,status:'source_not_recorded',label:'Earlier search records',source:'Catalogue not recorded',reason:'Catalogue breakdown unavailable'},presenceRecords:{count:null,status:'unavailable',label:'Presence records'},actualOrders:{count:3,status:'partial',label:'Saved order records',source:'All catalogues',reason:'Retrieved subset only'}};await render({loader:async()=>data});const context=container.querySelector('.sa2-history-summary');expect(context.textContent).toContain('Unavailable');expect(context.textContent).toContain('At least 3');expect(context.textContent).toContain('Retrieved subset only');expect(context.textContent).not.toContain('null');
+  });
   it('starts with live data and internal activity excluded', async () => {
     const loader = vi.fn(async () => payload());
     await render({ loader, sampleData: payload() });

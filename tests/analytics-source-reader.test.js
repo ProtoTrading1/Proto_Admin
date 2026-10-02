@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCE_DEFINITIONS, parseAnalyticsScope, previousAnalyticsScope, readAnalyticsSource } from '../lib/analytics-source-reader.mjs';
+import { SOURCE_DEFINITIONS, parseAnalyticsScope, previousAnalyticsScope, readAnalyticsSource, readTrackingStart } from '../lib/analytics-source-reader.mjs';
 
 test('range and source are validated and upper time bound excludes future records', () => {
   const scope = parseAnalyticsScope({ days: '7', source: 'instore' }, new Date('2026-10-02T10:00:00Z'));
@@ -65,4 +65,15 @@ test('evidence keys use the persisted type-specific lengths rather than truncati
    assert.equal(parseAnalyticsScope({evidenceType:type,evidenceValue:'x'.repeat(max)}).evidenceValue.length,max);
    assert.throws(()=>parseAnalyticsScope({evidenceType:type,evidenceValue:'x'.repeat(max+1)}));
  }
+});
+
+test('first tracking record reads one production timestamp without period/customer/internal filters',async()=>{
+ const calls=[];const query={select(value){calls.push(['select',value]);return this},eq(...args){calls.push(['eq',...args]);return this},order(...args){calls.push(['order',...args]);return this},async limit(value){calls.push(['limit',value]);return {data:[{created_at:'2026-10-01T22:00:00Z'}],error:null}}};
+ const result=await readTrackingStart({from(table){calls.push(['from',table]);return query}});assert.equal(result.available,true);assert.equal(result.firstProductionEventAt,'2026-10-01T22:00:00Z');assert.deepEqual(calls,[['from','shopping_events'],['select','created_at'],['eq','environment','production'],['order','created_at',{ascending:true}],['limit',1]]);assert.ok(result.meaning.includes('not a deployment timestamp'));
+});
+test('empty, missing and failed tracking metadata cannot manufacture a release date',async()=>{
+ const client=result=>({from(){return {select(){return this},eq(){return this},order(){return this},async limit(){return result}}}});
+ const empty=await readTrackingStart(client({data:[],error:null}));assert.equal(empty.available,true);assert.equal(empty.firstProductionEventAt,null);
+ for(const [code,expected] of [['42P01','not_installed'],['PGRST205','not_installed'],['42501','read_failed']]){const result=await readTrackingStart(client({data:[],error:{code,message:'Private database error'}}));assert.equal(result.available,false);assert.equal(result.error,expected);assert.equal(JSON.stringify(result).includes('Private'),false);assert.equal(result.firstProductionEventAt,null);}
+ assert.equal((await readTrackingStart({from(){throw new Error('Transport failed')}})).error,'read_failed');assert.equal((await readTrackingStart(client({data:[{created_at:'invalid'}],error:null}))).available,false);
 });

@@ -24,6 +24,22 @@ export function PeriodComparison({ comparison }) {
   return <p className="sa2-period-context">Current: {periodLabel(comparison.current)} · Previous equal period: {periodLabel(comparison.previous)}. End dates are exclusive. Changes describe recorded activity, not improvement or causation.</p>;
 }
 
+function TrackingCoverage({ trackingStart, historicalSummary, summary, source }) {
+  const first=trackingStart?.firstProductionEventAt;
+  const hasDate=Number.isFinite(Date.parse(first));
+  const history=historicalSummary || {};
+  const anyHistory=Object.values(history).some(metric=>Number(metric?.count)>0);
+  return <section className="sa2-tracking-context" aria-label="Tracking coverage and earlier records">
+    <h2>New tracking coverage</h2>
+    {hasDate?<p><strong>First recorded production activity:</strong> {new Date(first).toLocaleString('en-ZA',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'})} UTC. This is the first retained event across all periods and catalogues, including internal activity. It is not a deployment date or proof of complete historical coverage.</p>:<p>{trackingStart?.available===true?'No production shopping events are retained in the new tracking source.':'The first recorded production activity is unavailable in this response.'} New tracking counts cannot describe earlier customer activity.</p>}
+    <p>Visits, searches, product views, basket additions and the linked journey below use the new shopping tracking only. A recorded zero does not mean customers never browsed, searched or ordered.</p>
+    {summary.recordedVisits===0 && anyHistory && <p className="sa2-history-emphasis">New tracked visits are zero in this period, while existing records or saved orders are available below.</p>}
+    <h3>Existing records and saved orders in the selected period</h3>
+    <p className="sa2-note">These sources are separate records, not unique customer visits or steps in the linked journey. They can overlap and continue after tracking began; do not add them to the new tracking totals. {source!=='all'?'Earlier records cannot be split by Main catalogue and Instore. ':''}Saved order records cover all catalogues and statuses; they do not establish payment or revenue.</p>
+    {!historicalSummary?<p className="sa2-note">Historical source counts are not supplied in this response; their absence is not a recorded zero.</p>:<dl className="sa2-history-summary">{['presenceRecords','searches','journeys','events','actualOrders'].map(key=>{const metric=history[key];const known=['available','partial'].includes(metric?.status) && metric.count!=null;return <div key={key}><dt>{metric?.label || key}</dt><dd>{known?`${metric.status==='partial'?'At least ':''}${numberLabel(metric.count)}`:'Unavailable'}</dd><small>{metric?.source || 'Source unavailable'}</small>{metric?.reason && <p>{metric.reason}</p>}</div>;})}</dl>}
+  </section>;
+}
+
 function SupportingEvidence({ selection, evidence, loading, error, onRetry, onClose, onCustomer }) {
   const headingRef=useRef(null);
   useEffect(()=>revealHeading(headingRef.current),[selection]);
@@ -168,6 +184,8 @@ export default function ShoppingAnalyticsDashboard({ getAccessToken, sampleData 
       {Object.values(quality.responseLimits || {}).some(limit => limit.truncated) && <p className="sa2-note">Ranked lists are bounded for fast loading; aggregate totals above include all retrieved activity. Customer details load when selected.</p>}
       <div className="sa2-freshness"><span>Last {days} days · {SOURCE_NAMES[source]} · Latest activity: {labelDate(quality.latestEventAt || quality.lastEventAt)}</span><span>{includeInternal ? 'Internal activity included' : 'Internal and test activity excluded'}{quality.exclusions !== undefined && typeof quality.exclusions === 'number' ? ` · ${numberLabel(quality.exclusions)} excluded events` : ''}</span></div>
       {gaps.length > 0 && <div className="sa2-quality" role="status"><strong>Coverage notes</strong><ul>{gaps.map((gap,i) => <li key={i}>{typeof gap === 'string' ? gap : gap.message || gap.label}</li>)}</ul></div>}
+      <TrackingCoverage trackingStart={data.trackingStart} historicalSummary={data.historicalSummary} summary={summary} source={source}/>
+      <h2 className="sa2-new-tracking-heading">New shopping tracking in this period</h2>
       <PeriodComparison comparison={data.comparison}/>
       <dl className="sa2-summary">{[['Recorded visits','recordedVisits'],['Visits using search','searchVisits'],['Search adoption','searchUsageRate'],['Product views','productViews'],['Basket additions','basketAdds'],['Verified orders','verifiedOrders']].map(([label,key]) => <div key={key}><dt>{label}</dt><dd>{key === 'searchUsageRate' ? rateLabel(summary[key]) : numberLabel(summary[key])}</dd><p className="sa2-delta">{comparisonLabel(data.comparison?.metrics?.[key],{rate:key==='searchUsageRate'})}</p>{data.comparison?.metrics?.[key] && <small className="sa2-note">Previous: {key==='searchUsageRate'?rateLabel(data.comparison.metrics[key].previous):numberLabel(data.comparison.metrics[key].previous)}</small>}</div>)}</dl>
       <p className="sa2-note">Search adoption = recorded visits with a search ÷ recorded visits. These are measured visits, not all website traffic.</p>
@@ -179,6 +197,7 @@ export default function ShoppingAnalyticsDashboard({ getAccessToken, sampleData 
       <div className="sa2-two"><Panel title="Departments customers browse" note="Recorded department opens. Select a department for its product-view and basket evidence."><RankedBars rows={list(data.departments)} valueKey="views" unit="opens" onSelect={(row,event)=>inspect('department',row,event)}/></Panel><Panel title="Opportunities to investigate">{!list(data.actions).length ? <Empty>No supported opportunities identified in this period.</Empty> : <ul className="sa2-actions">{data.actions.map((action,i) => <li key={action.id || i}><h3>{action.title}</h3><p>{action.detail || action.description}</p>{action.evidence && <p className="sa2-note">{evidenceLabel(action.evidence)}</p>}{['term','product','department'].includes(action.drilldown?.type) && action.drilldown.value && <button aria-label={`Inspect evidence: ${action.title}`} onClick={event=>chooseEvidence({...action.drilldown,label:action.title},event)}>Inspect supporting activity</button>}</li>)}</ul>}</Panel></div>
       {evidenceSelection && <SupportingEvidence selection={evidenceSelection} evidence={supportingEvidence} loading={evidenceLoading} error={evidenceError} onRetry={()=>setEvidenceRetry(value=>value+1)} onClose={closeEvidence} onCustomer={inspectCustomer}/>}
       <Panel title="Customer interests and activity" note={`Registration profiles alongside recorded ${SOURCE_NAMES[source].toLowerCase()} activity in the last ${days} days.`}>
+        <p className="sa2-note">Search, product-view and basket counts in this table come from new shopping tracking. Existing customer records may exist even when those counts are zero. Orders in this table are verified submitted orders from new tracking, not all saved orders or search-attributed sales.</p>
         <label className="sa2-customer-search">Find a customer<input type="search" value={customerQuery} onChange={event => { setCustomerQuery(event.target.value); setSelected(null); }} placeholder="Customer or business name" maxLength={80}/></label>
         {quality.responseLimits?.customers?.truncated && <p className="sa2-note">Showing up to {quality.responseLimits.customers.returned} of {quality.responseLimits.customers.total} retrieved profiles. Type at least 3 characters to search all registered customers.</p>}
         {lookupLoading && <p role="status" className="sa2-note">Finding registered customers…</p>}

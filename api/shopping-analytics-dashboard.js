@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { CURRENT_ADMIN_EMAILS, requireAnalyticsAdmin } from './_analytics-auth.js';
 import { buildShoppingAnalytics, buildShoppingComparison, buildShoppingEvidence } from '../lib/shopping-analytics.mjs';
-import { SOURCE_DEFINITIONS, parseAnalyticsScope, previousAnalyticsScope, readAnalyticsSource } from '../lib/analytics-source-reader.mjs';
+import { SOURCE_DEFINITIONS, parseAnalyticsScope, previousAnalyticsScope, readAnalyticsSource, readTrackingStart } from '../lib/analytics-source-reader.mjs';
 
 export const config = { maxDuration: 60 };
 export function createShoppingDashboardHandler({
   requireAdmin = requireAnalyticsAdmin, clientFactory = createClient,
-  readSource = readAnalyticsSource, aggregate = buildShoppingAnalytics,
+  readSource = readAnalyticsSource, readStart = readTrackingStart, aggregate = buildShoppingAnalytics,
   environment = process.env, now = () => new Date(),
 } = {}) {
 return async function handler(req, res) {
@@ -48,13 +48,14 @@ return async function handler(req, res) {
     if (scope.evidenceType) return res.status(200).json({ evidence: buildShoppingEvidence(input, aggregationScope), scope, refreshedAt: now().toISOString() });
     const data = aggregate(input, aggregationScope);
     let comparison;
+    let trackingStart;
     if (!scope.customerId) {
       const previousScope = previousAnalyticsScope(aggregationScope);
       const previousInput = { customers: input.customers, products: input.products, statuses: { customers: input.statuses.customers, products: input.statuses.products } };
-      await Promise.all(['events', 'orders'].map(async name => {
+      await Promise.all([...['events', 'orders'].map(async name => {
         const result = await readSource(client, SOURCE_DEFINITIONS[name], previousScope);
         previousInput[name] = result.rows; previousInput.statuses[name] = result.status;
-      }));
+      }), (async () => { trackingStart = await readStart(client); })()]);
       comparison = buildShoppingComparison(input, previousInput, aggregationScope, previousScope, data);
     }
     if (scope.customerId) {
@@ -76,7 +77,8 @@ return async function handler(req, res) {
     }
     bounded.customers = bounded.customers.map(({ timeline, timelineTruncated, recommendations, ...customer }) => ({ ...customer, detailsAvailable: true }));
     return res.status(200).json({ summary: data.summary, trend: data.trend, funnel: data.funnel, popup: data.popup,
-      definitions: data.definitions, comparison, ...bounded, quality: { ...data.quality, responseLimits }, scope, refreshedAt: now().toISOString() });
+      definitions: data.definitions, comparison, trackingStart, historicalSummary: data.historicalSummary,
+      ...bounded, quality: { ...data.quality, responseLimits }, scope, refreshedAt: now().toISOString() });
   } catch {
     // No raw database errors, customer records or identifiers in server logs.
     return res.status(503).json({ error: 'Analytics could not be refreshed. Try again shortly.' });

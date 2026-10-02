@@ -6,6 +6,27 @@ const at = n => `2026-10-02T10:00:${String(n).padStart(2,'0')}Z`;
 const event = (type,n,extra={}) => ({event_id:`e${n}`,event_type:type,created_at:at(n),customer_id:'c1',session_id:'s1',source:'main',environment:'production',...extra});
 const fixture = events => ({events,visits:[],searches:[],journeys:[],legacyEvents:[],orders:[],customers:[{id:'c1',name:'Shop',product_categories:['Paint'],sales_channels:['Retail'],supply_needs:['Monthly']}],products:[{sku:'P1',name:'Olive paint',category:'Paint',is_archived:false,stock_on_hand:12}]});
 
+test('empty new tracking preserves separate older records and all saved order statuses without funnel credit',()=>{
+  const input=fixture([]);input.visits=[{id:'v1',customer_id:'c1',started_at:at(1)}];input.searches=[{id:'q1',customer_id:'c1',created_at:at(2),search_term:'paint'}];input.journeys=[{id:'j1',customer_id:'c1',created_at:at(3)}];input.legacyEvents=[{id:'l1',customer_id:'c1',created_at:at(4)}];input.orders=[{id:'o1',customer_id:'c1',status:'cancelled',created_at:at(5)},{id:'o2',customer_id:'c1',status:'submitted',created_at:at(6)}];input.orders.push({...input.orders[1]});
+  const result=buildShoppingAnalytics(input);assert.equal(result.summary.recordedVisits,0);assert.equal(result.summary.verifiedOrders,0);assert.equal(result.historicalSummary.searches.count,1);assert.equal(result.historicalSummary.presenceRecords.count,1);assert.equal(result.historicalSummary.actualOrders.count,2);assert.equal(result.summary.actualOrders,1);assert.deepEqual(result.funnel.map(stage=>stage.count),[0,0,0,0,0,0]);
+});
+test('older catalogue splits remain unknown even if an untrusted legacy row carries a source',()=>{
+  const input=fixture([]);input.searches=[{id:'q1',customer_id:'c1',created_at:at(2),source:'main'}];input.visits=[{id:'v1',customer_id:'c1',started_at:at(1)}];input.orders=[{id:'o1',customer_id:'c1',created_at:at(3)}];
+  for(const source of ['main','instore']){const h=buildShoppingAnalytics(input,{source}).historicalSummary;for(const key of ['searches','journeys','events','presenceRecords']){assert.equal(h[key].count,null);assert.equal(h[key].status,'source_not_recorded');}assert.equal(h.actualOrders.count,1);assert.equal(h.actualOrders.source,'All catalogues');}
+});
+test('historical missing and partial reads distinguish unavailable from subset counts and verified zero',()=>{
+  const input=fixture([]);input.searches=[{id:'q1',customer_id:'c1',created_at:at(2)}];input.sourceStatuses={searches:{available:true,truncated:true,error:'row_limit'},visits:{available:false,error:'read_failed'}};
+  const h=buildShoppingAnalytics(input).historicalSummary;assert.equal(h.searches.count,1);assert.equal(h.searches.status,'partial');assert.equal(h.presenceRecords.count,null);assert.equal(h.presenceRecords.status,'unavailable');assert.equal(h.events.count,0);assert.equal(h.events.status,'available');assert.equal(buildShoppingAnalytics({}).historicalSummary.actualOrders.count,null);
+});
+test('historical date window and staff exclusions apply without merging old customer sessions',()=>{
+  const input=fixture([]);input.customers.push({id:'staff',role:'admin'});input.searches=[{id:'old',customer_id:'c1',created_at:'2026-10-01T10:00:00Z'},{id:'new',customer_id:'c1',created_at:at(2)},{id:'staff',customer_id:'staff',created_at:at(3)},{id:'preview',customer_id:'c1',created_at:at(4),environment:'preview'}];
+  const scope={since:'2026-10-02T00:00:00Z',until:'2026-10-03T00:00:00Z'};assert.equal(buildShoppingAnalytics(input,scope).historicalSummary.searches.count,1);assert.equal(buildShoppingAnalytics(input,{...scope,includeInternal:true}).historicalSummary.searches.count,3);
+});
+test('incomplete customer profiles suppress older counts until internal inclusion is explicit',()=>{
+  const input=fixture([]);input.searches=[{id:'q',customer_id:'c1',created_at:at(2)}];input.sourceStatuses={customers:{available:true,truncated:true}};
+  assert.equal(buildShoppingAnalytics(input).historicalSummary.searches.count,null);assert.equal(buildShoppingAnalytics(input).historicalSummary.actualOrders.count,null);assert.equal(buildShoppingAnalytics(input,{includeInternal:true}).historicalSummary.searches.count,1);
+});
+
 test('zero denominators remain unavailable, unavailable sources never become successful zeros',()=>{
   assert.equal(buildShoppingAnalytics(fixture([])).summary.searchUsageRate,null);
   assert.equal(buildShoppingAnalytics({}).summary.searches,null);
