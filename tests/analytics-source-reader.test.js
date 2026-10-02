@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCE_DEFINITIONS, parseAnalyticsScope, previousAnalyticsScope, readAnalyticsSource, readTrackingStart } from '../lib/analytics-source-reader.mjs';
+import { SOURCE_DEFINITIONS, parseAnalyticsScope, previousAnalyticsScope, readAnalyticsSource, readTrackingStart, readTrackingHealth } from '../lib/analytics-source-reader.mjs';
 
 test('range and source are validated and upper time bound excludes future records', () => {
   const scope = parseAnalyticsScope({ days: '7', source: 'instore' }, new Date('2026-10-02T10:00:00Z'));
@@ -76,4 +76,11 @@ test('empty, missing and failed tracking metadata cannot manufacture a release d
  const empty=await readTrackingStart(client({data:[],error:null}));assert.equal(empty.available,true);assert.equal(empty.firstProductionEventAt,null);
  for(const [code,expected] of [['42P01','not_installed'],['PGRST205','not_installed'],['42501','read_failed']]){const result=await readTrackingStart(client({data:[],error:{code,message:'Private database error'}}));assert.equal(result.available,false);assert.equal(result.error,expected);assert.equal(JSON.stringify(result).includes('Private'),false);assert.equal(result.firstProductionEventAt,null);}
  assert.equal((await readTrackingStart({from(){throw new Error('Transport failed')}})).error,'read_failed');assert.equal((await readTrackingStart(client({data:[{created_at:'invalid'}],error:null}))).available,false);
+});
+
+test('tracking recency is a bounded production timestamp read, not a healthy or broken pipeline claim',async()=>{
+ const calls=[];const query={select(value){calls.push(['select',value]);return this},eq(...args){calls.push(['eq',...args]);return this},order(...args){calls.push(['order',...args]);return this},async limit(value){calls.push(['limit',value]);return {data:[{created_at:'2026-10-02T10:00:00Z'}]}}};
+ const value=await readTrackingHealth({from:()=>query});assert.equal(value.status,'available');assert.equal(value.lastProductionEventAt,'2026-10-02T10:00:00Z');assert.deepEqual(calls.find(row=>row[0]==='order'),['order','created_at',{ascending:false}]);assert.equal(calls.at(-1)[1],1);assert.ok(value.description.includes('staff'));assert.ok(value.description.includes('does not establish a tracking failure'));
+ const empty=await readTrackingHealth({from:()=>({...query,limit:async()=>({data:[]})})});assert.equal(empty.status,'available');assert.equal(empty.lastProductionEventAt,null);
+ const failed=await readTrackingHealth({from:()=>({...query,limit:async()=>({error:{message:'secret'}})})});assert.equal(failed.status,'unavailable');assert.equal(JSON.stringify(failed).includes('secret'),false);
 });

@@ -9,12 +9,12 @@ const at = minute => new Date(NOW.getTime() - 3600000 + minute * 60000).toISOStr
 function response() { return { statusCode: null, body: null, headers: {}, setHeader(key,value) { this.headers[key] = value; }, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } }; }
 function fixture() { return { shopping_events: [], customer_visits: [], search_analytics: [], customer_journey_events: [], analytics_events: [], orders: [], customers: [], products: [] }; }
 function event(type, minute, extra = {}) { return { event_id: `${type}-${minute}`, event_type: type, created_at: at(minute), customer_id: 'customer', session_id: 'session', source: 'main', environment: 'production', ...extra }; }
-function setup({ tables = fixture(), statuses = {}, admin = true, guard, reader, startReader = async () => ({ firstProductionEventAt: null, available: true, error: null }), client = {} } = {}) {
+function setup({ tables = fixture(), statuses = {}, admin = true, guard, reader, historyReader, healthReader, startReader = async () => ({ firstProductionEventAt: null, available: true, error: null }), client = {} } = {}) {
   const calls = [];
   const requireAdmin = guard || (async (_req,res) => { if (!admin) { res.status(401).json({ error: 'Sign in required' }); return null; } return { id: 'admin' }; });
   const clientFactory = (...args) => { calls.push(args); return client; };
   const readSource = reader || (async (_client,definition) => ({ rows: tables[definition.table] || [], status: statuses[definition.table] || { available: true, error: null, truncated: false } }));
-  return { calls, handler: createShoppingDashboardHandler({ requireAdmin, clientFactory, readSource, readStart: startReader, environment: ENV, now: () => NOW }) };
+  return { calls, handler: createShoppingDashboardHandler({ requireAdmin, clientFactory, readSource, readStart: startReader, ...(historyReader?{readHistory:historyReader}:{}), ...(healthReader?{readHealth:healthReader}:{}), environment: ENV, now: () => NOW }) };
 }
 const req = query => ({ method: 'GET', query: query || {}, headers: {} });
 
@@ -138,4 +138,20 @@ test('historical read failures and row caps remain distinct from no customer act
  const tables=fixture();tables.search_analytics=[{id:'legacy',customer_id:'customer',search_term:'paint',created_at:at(1)}];
  const capped=setup({tables,statuses:{search_analytics:{available:true,truncated:true,error:'row_limit'}}});const partial=response();await capped.handler(req(),partial);assert.equal(partial.body.historicalSummary.searches.count,1);assert.equal(partial.body.historicalSummary.searches.status,'partial');
  const failed=setup({tables,statuses:{search_analytics:{available:false,truncated:false,error:'read_failed'}}});const unavailable=response();await failed.handler(req(),unavailable);assert.equal(unavailable.body.historicalSummary.searches.count,null);assert.equal(unavailable.body.historicalSummary.searches.status,'unavailable');assert.equal(unavailable.body.summary.searches,0);
+});
+
+test('database aggregates skip all four raw history tables in overview without blending new metrics',async()=>{
+ const reads=[];let historyCalls=0;const historicalSummary=Object.fromEntries(['presenceRecords','searches','journeys','events','actualOrders'].map(key=>[key,{count:123,status:'available',label:key,source:'Catalogue not recorded',reason:null}]));
+ const historyReader=async()=>{historyCalls++;return {available:true,historicalSummary,historicalSearch:{status:'complete',searches:123,noResults:10,unknownResultsCount:3,daily:[],terms:[],noResultTerms:[],limitedTerms:false,limitedNoResultTerms:false}}};
+ const reader=async(_client,definition,scope,options)=>{reads.push({table:definition.table,scope,options});return {rows:[],status:{available:true,truncated:false}}};
+ const {handler}=setup({reader,historyReader,healthReader:async()=>({status:'available',lastProductionEventAt:'2026-10-02T10:00:00Z'})});const res=response();await handler(req(),res);
+ assert.equal(res.statusCode,200);assert.equal(historyCalls,1);assert.equal(reads.length,6);assert.ok(reads.every(row=>!['customer_visits','search_analytics','customer_journey_events','analytics_events'].includes(row.table)));assert.equal(res.body.summary.searches,0);assert.equal(res.body.historicalSearch.searches,123);assert.equal(res.body.quality.legacyCounts.searches,123);assert.equal(res.body.quality.sources.searches.aggregated,true);assert.equal(res.body.trackingHealth.lastProductionEventAt,'2026-10-02T10:00:00Z');assert.equal(res.body.actions.some(row=>row.id==='coverage'),false);
+});
+
+test('missing aggregate uses explicit bounded fallback; auth, evidence, details and lookup never call it',async()=>{
+ let histories=0;const reads=[];const historyReader=async()=>{histories++;return {available:false,error:'not_installed'}};
+ const reader=async(_client,definition,_scope,options)=>{reads.push([definition.table,options]);return {rows:[],status:{available:true,truncated:false}}};
+ const {handler}=setup({reader,historyReader});const res=response();await handler(req(),res);assert.equal(res.body.historicalSearch.status,'complete');assert.equal(histories,1);assert.deepEqual(reads.filter(([,options])=>options).map(([,options])=>options.maxRows),[5000,5000,5000,5000]);
+ for(const query of [{customerId:'00000000-0000-4000-8000-000000000001'},{evidenceType:'term',evidenceValue:'paint'}])await handler(req(query),response());assert.equal(histories,1);
+ const denied=setup({admin:false,historyReader});await denied.handler(req(),response());assert.equal(histories,1);
 });
