@@ -6,8 +6,8 @@ import { compressImage } from './products';
 // Vercel rejects a request before the function runs when the JSON body grows
 // beyond its platform limit. Base64 adds roughly one third to the source file,
 // so keep landed-shipment images comfortably below that boundary. Small files
-// retain their original bytes; larger camera images use the same 800px white-
-// canvas JPEG preparation already used by Product Manager uploads.
+// retain their original bytes; larger camera images retain the legacy 800px
+// white-canvas JPEG preparation for this bulk-intake path.
 export const INSTORE_INLINE_IMAGE_MAX_BYTES = 1_500_000;
 
 function jpegUploadFilename(filename) {

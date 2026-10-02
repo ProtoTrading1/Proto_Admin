@@ -3948,7 +3948,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
 
               <AdminField label="Product images (up to 4)" full>
                 <p className="adm-muted" style={{ fontSize: 12, margin: '0 0 10px' }}>
-                  Best size: 800×800 px square, white background, product centred — matches your resize script and catalog cards.
+                  Use a centred product on a white background. JPEG, PNG or WebP files up to 1.5 MB keep their original quality; larger files are resized to a maximum of 1600 px without stretching. Storefront thumbnails stay lightweight.
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   {PRODUCT_IMAGE_SLOTS.map((slot, slotIndex) => {
