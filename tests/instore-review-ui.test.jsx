@@ -36,7 +36,7 @@ async function click(node) {
   await act(async () => node.click());
 }
 async function change(node, value) {
-  const prototype = node.tagName === 'SELECT' ? window.HTMLSelectElement.prototype : window.HTMLInputElement.prototype;
+  const prototype = node.tagName === 'SELECT' ? window.HTMLSelectElement.prototype : node.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
   await act(async () => {
     Object.getOwnPropertyDescriptor(prototype, 'value').set.call(node, value);
     node.dispatchEvent(new Event(node.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
@@ -99,6 +99,34 @@ async function loadShipment(rows, { enabled = true } = {}) {
 }
 
 describe('Product Loader Instore integration', () => {
+  it('keeps uppercase website edits separate from Positill, survives retry, and shows them in final review', async () => {
+    await loadShipment([{ code: '8620200200' }]);
+    await change(container.querySelector('[aria-label="Website name 8620200200"]'), 'sparkly stickers');
+    await change(container.querySelector('[aria-label="Website description 8620200200"]'), 'self adhesive craft stickers');
+    await click(button('Retry live lookup'));
+    expect(container.querySelector('[aria-label="Website name 8620200200"]').value).toBe('SPARKLY STICKERS');
+    expect(container.querySelector('[aria-label="Website description 8620200200"]').value).toBe('SELF ADHESIVE CRAFT STICKERS');
+    expect(articles()[0].textContent).toContain('RHINESTONE STICKERS');
+    await click(articles()[0].querySelector('input[type="checkbox"]'));
+    const picker = [...container.querySelectorAll('select')].find((node) => [...node.options].some((option) => option.value === 'crafts'));
+    await change(picker, 'crafts'); await click(button('Assign category to selected (1)'));
+    await click(button('Review and add to Instore'));
+    expect(container.querySelector('[aria-label="Final Instore review"]').textContent).toContain('SPARKLY STICKERS');
+    expect(importLocalShipmentToInstore).not.toHaveBeenCalled();
+    importLocalShipmentToInstore.mockResolvedValue({ ok: true, sku: '8620200200', action: 'instore_import' });
+    await click(button('Confirm add 1 product to Instore'));
+    expect(importLocalShipmentToInstore).toHaveBeenCalledWith(expect.objectContaining({ code: '8620200200', title: 'RHINESTONE STICKERS', price: 12.5,
+      instoreCopy: { title: 'SPARKLY STICKERS', description: 'SELF ADHESIVE CRAFT STICKERS' } }), expect.anything());
+  });
+  it('blocks a blank website name without changing stock/category eligibility, then resets to source', async () => {
+    await loadShipment([{ code: '8620200200' }]);
+    await change(container.querySelector('[aria-label="Website name 8620200200"]'), '');
+    expect(container.querySelector('.ic-error').textContent).toContain('cannot be blank');
+    expect(articles()[0].textContent).toContain('Needs your attention');
+    await click(button('Reset to Positill wording'));
+    expect(container.querySelector('[aria-label="Website name 8620200200"]').value).toBe('RHINESTONE STICKERS');
+    expect(importLocalShipmentToInstore).not.toHaveBeenCalled();
+  });
   it('clears a destination when a previously assigned child category no longer exists', async () => {
     const withChild = [
       { id: 'crafts', label: 'Crafts', children: [{ id: 'stickers', label: 'Stickers', children: [] }] },

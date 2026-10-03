@@ -2,6 +2,7 @@ import { readApiJson } from './apiError.js';
 import { catalogueDisplayTitle, catalogueDescription } from './productLoaderDisplay.js';
 import { parseIntakeFilename, siblingSkuForCopy } from './parseIntakeFilename';
 import { compressImage } from './products';
+import { normalizeInstoreCopy } from '../../lib/instore-copy.mjs';
 
 // Vercel rejects a request before the function runs when the JSON body grows
 // beyond its platform limit. Base64 adds roughly one third to the source file,
@@ -151,6 +152,7 @@ export async function importLocalShipmentToInstore(item, { category, categoryPat
       ...(stockMode === 'received' ? { receiptLines } : {}),
       items: [{
         code: item.code,
+        ...(item.instoreCopy ? { websiteCopy: normalizeInstoreCopy(item.instoreCopy) } : {}),
         filename: preparedImage.filename || item.filename,
         path: item.sourcePath || item.file.webkitRelativePath || item.filename,
         contentType: preparedImage.contentType,

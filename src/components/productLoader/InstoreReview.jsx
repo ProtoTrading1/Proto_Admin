@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { catalogueDisplayTitle } from '../../lib/productLoaderDisplay.js';
+import { catalogueDisplayTitle, catalogueDescription } from '../../lib/productLoaderDisplay.js';
+import InstoreCopyFields from './InstoreCopyFields.jsx';
 import { filterInstoreReview, groupInstoreDestinations, INSTORE_REVIEW_LABELS, summarizeInstoreReview } from '../../lib/instoreReview.js';
 import './InstoreReview.css';
 
 export default function InstoreReview({ entries, selected, busy, importEnabled, importBlockReason,
   categoryPicker, onAssignCategory, canAssignCategory, onSelect, onClearSelection, onImport, onRefresh,
-  stockInfo, receipt = [], onRetryFailed, stockMode, statusState = importEnabled ? 'enabled' : 'disabled', onRetryStatus }) {
+  stockInfo, receipt = [], onRetryFailed, stockMode, statusState = importEnabled ? 'enabled' : 'disabled', onRetryStatus, onCopyChange, onEditListed }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('working');
   const [selectedOnly, setSelectedOnly] = useState(false);
@@ -94,7 +95,16 @@ export default function InstoreReview({ entries, selected, busy, importEnabled, 
               : /filename|exact SKU/i.test(reason) ? 'Check the image filename against the exact Positill SKU, then choose the corrected image.'
                 : 'Check its source details or retry live lookup.'}</small>}
             {state === 'listed' && <small>Edit the existing catalogue item to make changes.</small>}
+            {entry.listedInstore && onEditListed && <button type="button" className="adm-btn-ghost" disabled={busy} onClick={() => onEditListed(sku)}>Edit website wording</button>}
           </div>
+          {entry.canReview && onCopyChange && <details className="ir-copy-draft" onToggle={() => setReviewing(false)}>
+            <summary>{row.instoreCopy ? 'Website wording edited — review or reset' : 'Edit website name and description before adding'}</summary>
+            <p className="ir-copy-source">Positill wording (unchanged): {catalogueDescription(row) || catalogueDisplayTitle(row)}</p>
+            <InstoreCopyFields sku={sku} disabled={busy} copy={row.instoreCopy || { title: catalogueDisplayTitle(row).toUpperCase(), description: catalogueDescription(row).toUpperCase() }}
+              onChange={(copy) => { onCopyChange(key, copy); setReviewing(false); }} />
+            <button type="button" className="adm-btn-ghost" disabled={busy || !row.instoreCopy} onClick={() => { onCopyChange(key, null); setReviewing(false); }}>Reset to Positill wording</button>
+            <small>Draft only. Nothing is saved until you confirm adding this product.</small>
+          </details>}
         </article>;
       })}
       {!filtered.length && <p className="ir-empty">No products match these filters. Change the filters to see the rest of this batch.</p>}
@@ -102,6 +112,8 @@ export default function InstoreReview({ entries, selected, busy, importEnabled, 
     {reviewing && <section ref={confirmationRef} tabIndex={-1} className="ir-confirmation" aria-label="Final Instore review">
       <span className="ir-step">STEP 3</span><h3>Review and add to Instore</h3><p>{selectedEntries.length} selected {selectedEntries.length === 1 ? 'product' : 'products'}. The server checks current stock and duplicates again before adding.</p>
       <ul>{groupInstoreDestinations(selectedEntries).map((group) => <li key={group.destination}><strong>{group.destination} · {group.count}</strong><p>{group.skus.join(', ')}</p></li>)}</ul>
+      <h4>Website wording to publish (CAPITALS)</h4>
+      <ul className="ir-copy-summary">{selectedEntries.map(({ row, sku }) => <li key={sku}><strong>{sku} · {row.instoreCopy?.title || catalogueDisplayTitle(row).toUpperCase()}</strong><br />{row.instoreCopy?.description || catalogueDescription(row).toUpperCase()}</li>)}</ul>
       {blocked.length > 0 && <p role="alert">Resolve every selected product that needs attention, or remove it from the selection.</p>}
       <button type="button" className="adm-btn-red" disabled={busy || Boolean(disabledReason)} onClick={() => { setReviewing(false); void onImport(); }}>Confirm add {selectedEntries.length} {selectedEntries.length === 1 ? 'product' : 'products'} to Instore</button>
       <button type="button" className="adm-btn-ghost" disabled={busy} onClick={() => setReviewing(false)}>Back to review</button>

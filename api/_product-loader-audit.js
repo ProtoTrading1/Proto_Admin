@@ -65,6 +65,7 @@ export async function writeRequiredProductPublishAudit(sb, input) {
 
 export function auditOutcomeFromRow(row) {
   const outcome = row?.new_values?.outcome;
+  if (row?.publish_mode === 'instore_copy_intent' && outcome === 'pending') return 'pending';
   if (outcome === 'dormant') return 'dormant';
   if (outcome === 'archived') return 'archived';
   if (outcome === 'failed') return 'failed';

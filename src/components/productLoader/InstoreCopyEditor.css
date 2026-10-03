@@ -1,0 +1,25 @@
+.ic-editor { margin-top: 28px; padding: 20px; border: 1px solid #c9d5e2; border-radius: 10px; background: #f7fafc; color: #18304a; }
+.ic-editor h3 { margin: 0 0 8px; }
+.ic-editor p, .ic-fields p { font-size: 12px; line-height: 1.6; }
+.ic-lookup, .ic-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 14px; }
+.ic-lookup label, .ic-fields label { display: grid; gap: 6px; font-size: 12px; font-weight: 650; min-width: 0; }
+.ic-lookup label { flex: 1 1 180px; max-width: 400px; }
+.ic-fields { min-width: 0; border: 1px solid #dbe3ec; border-radius: 7px; padding: 12px; margin: 12px 0; }
+.ic-fields legend { font-size: 12px; font-weight: 700; }
+.ic-fields label + label { margin-top: 12px; }
+.ic-fields input, .ic-fields textarea, .ic-lookup input { box-sizing: border-box; width: 100%; min-height: 42px; padding: 9px; font: inherit; color: #18304a; background: white; border: 1px solid #bac9d9; border-radius: 6px; }
+.ic-fields textarea { resize: vertical; line-height: 1.5; }
+.ic-fields small { display: block; margin-top: 7px; font-size: 11px; overflow-wrap: anywhere; }
+.ic-fields input:focus-visible, .ic-fields textarea:focus-visible, .ic-lookup input:focus-visible, .ic-editor button:focus-visible { outline: 3px solid #679ad1; outline-offset: 3px; }
+.ic-record span { display: block; color: #526278; }
+.ic-error { color: #ac2d37; }.ic-success { background: #e7f5eb; padding: 12px; border-radius: 7px; }
+.ic-confirmation { border-top: 1px solid #c9d5e2; margin-top: 18px; padding-top: 4px; }
+.ic-confirmation dl, .ir-copy-summary { font-size: 12px; line-height: 1.6; }
+.ic-confirmation dd { margin: 0 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ic-confirmation dt { font-weight: 700; color: #526278; }
+.ir-copy-draft { grid-column: 2 / -1; min-width: 0; }
+.ir-copy-draft summary { cursor: pointer; font-size: 12px; font-weight: 650; padding: 5px 0; }
+.ir-copy-source { font-size: 12px; overflow-wrap: anywhere; }
+.ir-copy-summary li { margin: 12px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+@container (max-width: 800px) { .ir-copy-draft { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .ic-editor { padding: 14px; }.ic-actions > button { width: 100%; }.ic-lookup > button { width: 100%; } }

@@ -124,7 +124,9 @@ describe('landed shipment → Instore-only safety contract', () => {
     expect(importOne).toContain('const title = catalogueDisplayTitle(sourceItem).toUpperCase();');
     expect(importOne).toContain('const description = catalogueDescription(sourceItem).toUpperCase();');
     expect(importOne).toContain('title,');
-    expect(importOne).toContain('original_description: description,');
+    expect(importOne).toContain('original_description: websiteCopy.description,');
+    expect(importOne).toContain('title: websiteCopy.title,');
+    expect(importOne).toContain('normalizeInstoreCopy(item.websiteCopy)');
   });
 
   it('does not require optional unit metadata columns in the legacy Instore table', () => {

@@ -28,6 +28,8 @@ import { catalogueDisplayTitle, loaderCodeLabel } from '../../lib/productLoaderD
 import LoaderCodeEllipsis from './LoaderCodeEllipsis.jsx';
 import CategoryPathSelect, { normalizeCategoryPathValue } from './CategoryPathSelect';
 import InstoreReview from './InstoreReview.jsx';
+import InstoreCopyEditor from './InstoreCopyEditor.jsx';
+import { instoreCopyError } from '../../../lib/instore-copy.mjs';
 import { buildInstoreReview, normalizeReviewSku, uniqueInstoreRows } from '../../lib/instoreReview.js';
 import { planSharedVariantImage } from '../../lib/sharedVariantImage.js';
 import { loaderPriceSourceLabel } from '../../../lib/catalogue-price.mjs';
@@ -313,6 +315,8 @@ export default function ProductLoaderUpload({
   // The reviewer chooses the exact rows to make available in Instore.
   const [instoreSelected, setInstoreSelected] = useState(() => new Set());
   const [instoreReceipt, setInstoreReceipt] = useState([]);
+  const [instoreCopyOpenRequest, setInstoreCopyOpenRequest] = useState(null);
+  const [instoreCopyPending, setInstoreCopyPending] = useState(false);
   const [sharedPhotoFilename, setSharedPhotoFilename] = useState('');
   const [sharedVariantCodes, setSharedVariantCodes] = useState('');
   const importRunningRef = useRef(false);
@@ -372,7 +376,7 @@ export default function ProductLoaderUpload({
     return () => { active = false; };
   }, [instoreOnly, instoreStatusAttempt]);
 
-  const hasPendingWork = instoreOnly && (scanning || processing || instoreSelected.size > 0
+  const hasPendingWork = instoreOnly && (scanning || processing || instoreCopyPending || instoreSelected.size > 0
     || (sourceFiles.length > 0 && items.length === 0)
     || Boolean(receivedStock?.quantities?.size || receivedStock?.sellingUnits?.size)
     || items.some((row) => !['instore', 'skipped', 'archived'].includes(row.status)));
@@ -742,6 +746,8 @@ export default function ProductLoaderUpload({
     if (instoreStockMode === 'received' && !receivedStock?.quantities?.size) return setError('Upload the Stock Received Excel so every SKU has a confirmed quantity.');
     const rows = uniqueInstoreRows(shipmentItems).filter((row) => instoreSelected.has(row.filename));
     if (!rows.length) return setError('Select at least one product to add to Instore.');
+    const invalidCopy = rows.find((row) => row.instoreCopy && instoreCopyError(row.instoreCopy));
+    if (invalidCopy) return setError(`${invalidCopy.code}: ${instoreCopyError(invalidCopy.instoreCopy)}`);
     const blockedRow = rows.find((row) => !canSelectForInstore(row, receiptLines, row.instoreCategoryPath, instoreStockMode));
     if (blockedRow) return setError(`${loaderCodeLabel(blockedRow)} cannot be sent: ${instoreSelectionBlocker(blockedRow, receiptLines, blockedRow.instoreCategoryPath, instoreStockMode) || 'review its destination and source data'}`);
     importRunningRef.current = true;
@@ -810,6 +816,7 @@ export default function ProductLoaderUpload({
         if (!targets.some((target) => target.filename === row.filename)) return row;
         const fresh = freshByName.get(row.filename);
         return fresh ? { ...fresh, file: row.file, previewUrl: row.previewUrl,
+          instoreCopy: normalizeReviewSku(fresh.code) === normalizeReviewSku(row.code) ? row.instoreCopy : undefined,
           sharedFamilySource: row.sharedFamilySource, sourcePath: row.sourcePath, status: '', processError: '' }
           : { ...row, positillSource: 'unavailable', lookupError: true, processError: 'Live lookup did not return this SKU.' };
       }));
@@ -970,8 +977,8 @@ export default function ProductLoaderUpload({
   const busy = scanning || processing;
   const unresolvedFamilyPhotos = instoreOnly ? items.filter((row) => row.file && row.group === 'not_found' && /^\d{10}$/.test(String(row.code || ''))) : [];
   const reviewEntries = instoreOnly ? buildInstoreReview(shipmentItems, {
-    isReady: (row) => canSelectForInstore(row, receiptLines, row.instoreCategoryPath, instoreStockMode),
-    getBlocker: (row) => instoreSelectionBlocker(row, receiptLines, row.instoreCategoryPath, instoreStockMode),
+    isReady: (row) => canSelectForInstore(row, receiptLines, row.instoreCategoryPath, instoreStockMode) && !(row.instoreCopy && instoreCopyError(row.instoreCopy)),
+    getBlocker: (row) => instoreSelectionBlocker(row, receiptLines, row.instoreCategoryPath, instoreStockMode) || (row.instoreCopy ? instoreCopyError(row.instoreCopy) : ''),
   }) : [];
   const selectedInstoreEntries = reviewEntries.filter((entry) => instoreSelected.has(entry.key));
   const selectedInstoreSkuCount = selectedInstoreEntries.length;
@@ -1040,6 +1047,8 @@ export default function ProductLoaderUpload({
       <p>This explicit confirmation applies only to selected eligible numeric SKUs with PCS-only receipts and resets with a new folder.</p>
     </details>}
     <InstoreReview entries={reviewEntries} selected={instoreSelected} busy={busy} importEnabled={instoreImportEnabled}
+      onCopyChange={(key, copy) => setItems((previous) => previous.map((row) => row.filename === key ? { ...row, instoreCopy: copy } : row))}
+      onEditListed={(sku) => setInstoreCopyOpenRequest({ sku })}
       statusState={instoreSchemaError ? 'error' : instoreStatus === 'confirmed' && !instoreImportEnabled ? 'disabled' : instoreStatus}
       onRetryStatus={() => { setInstoreSchemaError(''); setInstoreStatusAttempt((attempt) => attempt + 1); }}
       importBlockReason={importBlockReason} stockMode={instoreStockMode} stockInfo={instoreStockInfo}
@@ -1049,6 +1058,7 @@ export default function ProductLoaderUpload({
       onSelect={(keys, checked) => setInstoreSelected((previous) => { const next = new Set(previous); for (const key of keys) { if (checked) next.add(key); else next.delete(key); } return next; })}
       onClearSelection={() => setInstoreSelected(new Set())} onImport={importToInstore} onRefresh={() => void refreshInstoreLookup()}
       receipt={instoreReceipt} onRetryFailed={() => void refreshInstoreLookup(true)} />
+    <InstoreCopyEditor openRequest={instoreCopyOpenRequest} onPendingChange={setInstoreCopyPending} disabled={busy} />
     {items.length > 0 && <details style={{ marginTop: 18 }}><summary>Stock maintenance and reports</summary><div className="pl-action-row">
       {instoreStockMode === 'received' && <button type="button" className="adm-btn-ghost" disabled={busy || Boolean(importBlockReason)} onClick={() => void correctInstoreReceivedQuantities()}>Correct selected received quantities ({selectedInstoreSkuCount})</button>}
       <button type="button" className="adm-btn-ghost" disabled={busy || !instoreImportEnabled || !instoreSchemaReady} onClick={() => void reconcileLandedStock()}>Reconcile GRV stock</button>

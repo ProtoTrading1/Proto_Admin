@@ -43,7 +43,7 @@ export function filterInstoreReview(entries, { query = '', status = 'working', s
   const term = query.trim().toLowerCase();
   return entries.filter((entry) => {
     const row = entry.row;
-    const description = [row.description, row.sqlRow?.DESCRIPTION, row.sqlRow?.description, row.sqlRow?.title, row.title].filter(Boolean).join(' ');
+    const description = [row.instoreCopy?.title, row.instoreCopy?.description, row.description, row.sqlRow?.DESCRIPTION, row.sqlRow?.description, row.sqlRow?.title, row.title].filter(Boolean).join(' ');
     const group = String(row.productGroup || row.sqlRow?.GROUP || row.sqlRow?.group || '');
     return (!term || `${entry.sku} ${description}`.toLowerCase().includes(term))
       && (selectedOnly ? selected.has(entry.key) : status === 'working' ? entry.state !== 'listed'

@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeInstoreCopy } from '../lib/instore-copy.mjs';
+import { recordInstoreCopyIntent } from './_instore-copy.js';
 import { catalogueDescription, catalogueDisplayTitle } from '../lib/product-loader-display.mjs';
 import { requireOwner, verifyAdminUser } from './_admin-auth.js';
 import { logProductLoaderAudit } from './_product-loader-audit.js';
@@ -174,12 +176,12 @@ async function importInstoreOne(sb, item, { receiptLines, actor, stockMode = 're
   }
   const source = sqlRowToPreview(raw);
   const sourceItem = { code: sku, sqlRow: source };
-  // Positill remains the source of the wording. Instore catalogue copy is
-  // deliberately standardised only at this write boundary so new landed
-  // products use the established all-caps shelf-label convention without
-  // altering Positill or the lookup preview.
+  // Positill supplies the default copy and every stock/category/unit check.
+  // Optional reviewed website wording is separate: it cannot influence the
+  // source checks or change Positill and is normalised only for the listing.
   const title = catalogueDisplayTitle(sourceItem).toUpperCase();
   const description = catalogueDescription(sourceItem).toUpperCase();
+  const websiteCopy = item.websiteCopy === undefined ? { title, description } : normalizeInstoreCopy(item.websiteCopy);
   // Positill STMAST PRICE_A is ex VAT. Persist the same VAT-inclusive,
   // rounded customer price that Product Loader displays for this live row.
   const price = customerPriceFromPositill(source?.price);
@@ -284,6 +286,7 @@ async function importInstoreOne(sb, item, { receiptLines, actor, stockMode = 're
   }
 
   const { buffer, filename, contentType } = decodeLocalImage(item, sku);
+  if (item.websiteCopy !== undefined) await recordInstoreCopyIntent(sb, { sku, actor, oldValues: { positillTitle: title, positillDescription: description }, copy: websiteCopy });
   const { objectPath, imageUrl } = await uploadInstoreImage(sb, {
     sku, filename, buffer, contentType,
   });
@@ -298,8 +301,8 @@ async function importInstoreOne(sb, item, { receiptLines, actor, stockMode = 're
       sku,
       supplier_name: 'POSITILL',
       barcode: sku,
-      title,
-      original_description: description,
+      title: websiteCopy.title,
+      original_description: websiteCopy.description,
       price,
       // PKS receipt lines are already sellable packs. PCS receipt lines are
       // converted through the canonical Positill unit while the GRV is pending.
@@ -353,6 +356,10 @@ async function importInstoreOne(sb, item, { receiptLines, actor, stockMode = 're
       imageSource: 'local_folder',
       newValues: {
         sourceKey,
+        positillTitle: title,
+        positillDescription: description,
+        websiteTitle: websiteCopy.title,
+        websiteDescription: websiteCopy.description,
         category,
         stockMode: liveStock ? 'positill_live' : 'received',
         receivedQty: receipt?.receivedQty ?? null,
