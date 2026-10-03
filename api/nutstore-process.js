@@ -111,6 +111,9 @@ async function publishOne(sb, item, { overwriteImage }) {
       image_url_two: null,
       image_url_three: null,
       image_url_four: null,
+      // Only a newly created website product is automatically placed in
+      // Just added. A later Nutstore image refresh preserves its current state.
+      is_new_arrival: true,
     });
     if (error) throw error;
   }
@@ -133,6 +136,7 @@ async function publishOne(sb, item, { overwriteImage }) {
       imageUrl,
       nutstorePath: path,
       filename: item.filename || filename,
+      justAdded: action === 'create',
     },
     publishedBy: String(item.publishedBy || '').trim() || null,
   });

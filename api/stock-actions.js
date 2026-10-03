@@ -262,8 +262,8 @@ export default async function handler(req, res) {
     }
 
     if (action === 'setNewArrival') {
-      // Toggle the New Arrivals flag (drives the storefront "New Stock"
-      // collection via is_new_arrival). New Arrivals is a live-catalogue concept
+      // Toggle the Just added flag (drives the storefront collection via
+      // is_new_arrival). This is a live-catalogue concept
       // and the button only appears on live rows, so this targets website_stock.
       const { sku, isNewArrival } = req.body;
       if (!sku) return res.status(400).json({ error: 'sku required' });

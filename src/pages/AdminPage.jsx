@@ -3849,7 +3849,7 @@ export default function AdminPage({ customer, onViewPortal, onSignOut }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
                       <input type="checkbox" checked={!!productForm.isNewArrival} onChange={(e) => setProductForm((p) => ({ ...p, isNewArrival: e.target.checked }))} />
-                      <span>Show in the <strong>New Stock</strong> ribbon on the homepage</span>
+                      <span>Show in <strong>Just added</strong> on the website</span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
                       <input type="checkbox" checked={!!productForm.toOrder} onChange={(e) => setProductForm((p) => ({ ...p, toOrder: e.target.checked }))} />

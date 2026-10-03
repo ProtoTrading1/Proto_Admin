@@ -292,7 +292,7 @@ function PmMobileProductCard({
             <span className="pm-mobile-card-badge">No image</span>
           )}
           {item.isNew && (
-            <span className="pm-mobile-card-badge" style={{ background: '#0f766e', color: '#fff' }}>Special</span>
+            <span className="pm-mobile-card-badge" style={{ background: '#0f766e', color: '#fff' }}>Just added</span>
           )}
           {item.toOrder && (
             <span className="pm-mobile-card-badge" style={{ background: '#b45309', color: '#fff' }}>To order</span>
@@ -474,7 +474,7 @@ export default function ProductManagerEngine({
   showCategorySidebar = true,
   initialToOrderOnly = false,
   title = 'Product Manager',
-  note = 'In-stock products are live on the site. Open a product to set its New Stock ribbon and To-order options.',
+  note = 'In-stock products are live on the site. Open a product to control its Just added placement and To-order options.',
 }) {
   const clampStatus = useCallback(
     (s) => (statuses.includes(s) ? s : statuses[0]),
@@ -1884,7 +1884,7 @@ export default function ProductManagerEngine({
                             <span style={{ fontSize: 10, fontWeight: 700, color: '#92400e', background: '#fef3c7', borderRadius: 4, padding: '1px 5px' }}>No image</span>
                           )}
                           {item.isNew && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#0f766e', borderRadius: 4, padding: '1px 5px' }}>Special</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#0f766e', borderRadius: 4, padding: '1px 5px' }}>Just added</span>
                           )}
                           {item.toOrder && (
                             <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#b45309', borderRadius: 4, padding: '1px 5px' }}>To order</span>

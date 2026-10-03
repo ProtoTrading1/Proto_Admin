@@ -117,7 +117,7 @@ export default function ProductLoaderNewProduct({ taxonomyTree = [], publishedBy
     <div className="pl-newproduct">
       <p className="adm-section-note" style={{ marginTop: 0 }}>
         Create a product that isn’t in Positill or the catalogue yet — enter its details, drop in up to four images, and
-        publish it live in one step. Slot 1 is the main image.
+        publish it live in one step. Newly created items automatically appear in <strong>Just added</strong> on the website; later edits do not restart that placement. Slot 1 is the main image.
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>

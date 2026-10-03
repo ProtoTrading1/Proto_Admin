@@ -242,6 +242,9 @@ export default async function handler(req, res) {
       image_url_three: null,
       image_url_four: null,
       ...imageFields,
+      // A row created by Product Loader is newly available on the website.
+      // Existing rows are image/content updates and must not re-enter Just added.
+      is_new_arrival: true,
       // An authored product has no ERP stock feed, so a 0-stock row would be
       // hidden by isPublishableOnWebsite. Keep it live regardless — the admin
       // explicitly chose to publish it (auto-OOS archiving is off anyway).
@@ -295,6 +298,7 @@ export default async function handler(req, res) {
       imageSlots: filledSlots,
       imageSource,
       publishMode,
+      justAdded: action === 'create',
       safetyCorrections: safeValues.corrections,
       filename: String(filename || '').trim() || null,
     },
